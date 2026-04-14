@@ -1,0 +1,24 @@
+{
+  "as_of": "2026-04-08",
+  "source_note": "Copy to fed_pricing_manual.json (gitignored) and edit. Used when CME FedWatch API is unavailable.",
+  "meetings": [
+    {
+      "meeting_date": "2026-05-07",
+      "source_timestamp": "2026-04-07",
+      "probability_hold": 0.45,
+      "probability_cut_25": 0.35,
+      "probability_cut_50": 0.12,
+      "probability_hike_25": 0.08,
+      "repricing_delta_label": "little changed"
+    },
+    {
+      "meeting_date": "2026-06-18",
+      "source_timestamp": "2026-04-07",
+      "probability_hold": 0.38,
+      "probability_cut_25": 0.42,
+      "probability_cut_50": 0.15,
+      "probability_hike_25": 0.05,
+      "repricing_delta_label": "little changed"
+    }
+  ]
+}

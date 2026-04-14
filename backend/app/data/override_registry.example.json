@@ -1,0 +1,12 @@
+[
+  {
+    "key": "pmi_manufacturing",
+    "value": 49.8,
+    "source_url": "https://www.ismworld.org/",
+    "source_class": "manual",
+    "entered_at": "2026-01-05T14:30:00Z",
+    "effective_at": "2026-01-01T00:00:00Z",
+    "expires_at": null,
+    "note": "Example manual PMI override."
+  }
+]

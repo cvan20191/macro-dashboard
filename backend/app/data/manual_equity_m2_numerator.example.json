@@ -1,0 +1,6 @@
+{
+  "equity_value_billions": 111355.4,
+  "as_of": "2025-10-01",
+  "source": "Example only — copy to manual_equity_m2_numerator.json to override Z.1 numerator",
+  "notes": "Priority: this file (manual_equity_m2_numerator.json) > FRED BOGZ1LM893064105Q > SPY fallback. WM2NS denominator is always from FRED."
+}
