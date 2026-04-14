@@ -7,14 +7,11 @@ import type { ReplayAssessment } from '../../types/replay'
 // The 8 regime labels from regime.py — must match backend exactly
 const REGIME_OPTIONS = [
   '',
-  'Goldilocks',
-  'Overheating',
-  'Stagflation Risk',
-  'Deflation Risk',
-  'Liquidity Transition',
-  'Fed Pivot Incoming',
-  'Crisis / Crash Watch',
-  'Recovery Runway',
+  'Quadrant A / Max Liquidity',
+  'Quadrant B / Mixed Liquidity',
+  'Quadrant C / Liquidity Transition',
+  'Quadrant D / Illiquid Regime',
+  'Quadrant Unknown / Wait',
 ]
 
 interface Props {

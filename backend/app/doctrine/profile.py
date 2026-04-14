@@ -29,6 +29,7 @@ class DoctrineProfile(BaseModel):
     bigtech_pe_buy_low: Threshold
     bigtech_pe_buy_high: Threshold
     bigtech_pe_pause: Threshold
+    speaker_forward_pe_switch_month: Threshold
     core_cpi_sticky: Threshold
     pmi_contraction: Threshold
     unemployment_trap_low: Threshold
@@ -57,6 +58,12 @@ DEFAULT_DOCTRINE_PROFILE = DoctrineProfile(
         kind="heuristic",
         scope="bigtech_forward_pe",
         note="Stretch threshold for new accumulation, not an automatic sell signal.",
+    ),
+    speaker_forward_pe_switch_month=Threshold(
+        value=10.0,
+        kind="heuristic",
+        scope="speaker_forward_pe_horizon",
+        note="Default doctrine switch into next-year focus near Q4; implementation helper, not a timeless market law.",
     ),
     core_cpi_sticky=Threshold(
         value=3.0,

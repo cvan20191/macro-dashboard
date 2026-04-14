@@ -5,6 +5,11 @@ interface Props {
 }
 
 const REGIME_COLORS: Record<string, { bg: string; border: string; text: string }> = {
+  'Quadrant A / Max Liquidity':    { bg: 'var(--green-bg)',  border: 'var(--green-dim)',  text: 'var(--green)'  },
+  'Quadrant B / Mixed Liquidity':  { bg: 'var(--yellow-bg)', border: 'var(--yellow-dim)', text: 'var(--yellow)' },
+  'Quadrant C / Liquidity Transition': { bg: 'var(--blue-bg)', border: 'var(--blue-dim)', text: 'var(--blue)' },
+  'Quadrant D / Illiquid Regime':  { bg: 'var(--red-bg)',    border: 'var(--red-dim)',    text: 'var(--red)'    },
+  'Quadrant Unknown / Wait':       { bg: 'var(--bg-card-raised)', border: 'var(--border)', text: 'var(--text-secondary)' },
   'Max Liquidity':             { bg: 'var(--green-bg)',  border: 'var(--green-dim)',  text: 'var(--green)'  },
   'Liquidity Transition':      { bg: 'var(--blue-bg)',   border: 'var(--blue-dim)',   text: 'var(--blue)'   },
   'Buy-the-Dip Window':        { bg: 'var(--green-bg)',  border: 'var(--green-dim)',  text: 'var(--green)'  },

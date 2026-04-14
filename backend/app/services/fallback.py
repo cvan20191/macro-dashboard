@@ -26,6 +26,26 @@ from app.schemas.summary import (
 # Regime-keyed teaching notes
 # ---------------------------------------------------------------------------
 _REGIME_TEACHING_NOTES: dict[str, str] = {
+    "Quadrant A / Max Liquidity": (
+        "Quadrant A means rates are easing while the balance sheet is expanding, "
+        "which is the speaker's clearest broad liquidity tailwind."
+    ),
+    "Quadrant B / Mixed Liquidity": (
+        "Quadrant B is mixed liquidity: balance-sheet support exists, but rising-rate "
+        "pressure still keeps the regime selective rather than full-risk-on."
+    ),
+    "Quadrant C / Liquidity Transition": (
+        "Quadrant C means rates are easing while the balance sheet is still "
+        "contracting; markets can improve here, but it is a transition regime, not full QE."
+    ),
+    "Quadrant D / Illiquid Regime": (
+        "Quadrant D is maximum illiquidity: rates are tight and the balance sheet is "
+        "contracting, so capital is scarce and valuation support matters less."
+    ),
+    "Quadrant Unknown / Wait": (
+        "An unknown quadrant means the medium-term liquidity path is still ambiguous. "
+        "The doctrine response is patience rather than forcing a bullish or bearish call."
+    ),
     "Max Liquidity": (
         "In max-liquidity setups, rates are generally easier and balance-sheet "
         "pressure has eased, contributing to a supportive liquidity regime."
@@ -127,6 +147,10 @@ def _derive_main_tension(state: DashboardState) -> str:
     if state.dollar_context and state.dollar_context.dxy_pressure:
         tensions.append(
             "dollar pressure is adding friction to the macro backdrop"
+        )
+    if state.liquidity_plumbing and state.liquidity_plumbing.balance_sheet_expansion_not_qe:
+        tensions.append(
+            "headline balance-sheet support looks more like plumbing stabilization than clean QE"
         )
 
     if not tensions:
@@ -240,7 +264,7 @@ def build_fallback_summary(
     )
 
     headline = (
-        f"The macro dashboard is currently in a {regime} regime. "
+        f"The macro dashboard is currently in {regime}. "
         f"The framework implies: {posture_label}."
     )
     expanded = _derive_expanded_summary(
@@ -265,6 +289,8 @@ def build_fallback_summary(
     if conclusion is not None and conclusion.leniency_notes:
         first_note = conclusion.leniency_notes[0]
         teaching_note = _LENIENCY_TEACHING.get(first_note, teaching_note)
+    if state.tactical_state:
+        teaching_note = f"{teaching_note} Tactical state: {state.tactical_state}."
 
     meta = SummaryMeta(
         used_fallback=True,

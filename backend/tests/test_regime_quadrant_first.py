@@ -1,0 +1,98 @@
+from __future__ import annotations
+
+from app.schemas.indicator_snapshot import (
+    GrowthInput,
+    IndicatorSnapshot,
+    InflationInput,
+    LiquidityInput,
+    SystemicStressInput,
+    ValuationInput,
+)
+from app.services.rules.dashboard_state_builder import build_dashboard_state_with_conclusion
+
+
+def _snapshot(*, quadrant: str, buy_zone: bool = False, stretched: bool = False, trap: bool = False) -> IndicatorSnapshot:
+    if quadrant == "A":
+        liquidity = LiquidityInput(
+            fed_funds_rate=4.0,
+            rate_trend_1m="down",
+            rate_trend_3m="down",
+            balance_sheet_assets=7_000_000,
+            balance_sheet_trend_1m="up",
+            balance_sheet_trend_3m="up",
+            rate_cycle_position=0.7,
+        )
+    elif quadrant == "B":
+        liquidity = LiquidityInput(
+            fed_funds_rate=4.5,
+            rate_trend_1m="up",
+            rate_trend_3m="up",
+            balance_sheet_assets=7_000_000,
+            balance_sheet_trend_1m="up",
+            balance_sheet_trend_3m="up",
+            rate_cycle_position=0.8,
+        )
+    elif quadrant == "C":
+        liquidity = LiquidityInput(
+            fed_funds_rate=4.25,
+            rate_trend_1m="down",
+            rate_trend_3m="down",
+            balance_sheet_assets=6_800_000,
+            balance_sheet_trend_1m="flat",
+            balance_sheet_trend_3m="down",
+            rate_cycle_position=0.7,
+        )
+    else:
+        liquidity = LiquidityInput(
+            fed_funds_rate=4.75,
+            rate_trend_1m="up",
+            rate_trend_3m="up",
+            balance_sheet_assets=6_700_000,
+            balance_sheet_trend_1m="down",
+            balance_sheet_trend_3m="down",
+            rate_cycle_position=0.9,
+        )
+
+    forward_pe = 22.0 if buy_zone else 31.0 if stretched else 27.0
+    return IndicatorSnapshot(
+        liquidity=liquidity,
+        growth=GrowthInput(
+            pmi_manufacturing=48.0 if trap else 52.0,
+            pmi_services=51.0,
+            unemployment_rate=4.2,
+            unemployment_trend="flat",
+            initial_claims_trend="flat",
+            payrolls_trend="flat",
+        ),
+        inflation=InflationInput(
+            core_cpi_yoy=3.2 if trap else 2.4,
+            core_cpi_mom=0.2,
+            shelter_status="sticky" if trap else "easing",
+            services_ex_energy_status="sticky" if trap else "easing",
+            wti_oil=78.0,
+            oil_risk_active=False,
+        ),
+        valuation=ValuationInput(
+            forward_pe=forward_pe,
+            pe_basis="forward",
+            signal_mode="actionable",
+            basis_confidence=0.95,
+        ),
+        systemic_stress=SystemicStressInput(),
+    )
+
+
+def test_quadrant_b_green_does_not_turn_into_buy_the_dip() -> None:
+    state, conclusion = build_dashboard_state_with_conclusion(_snapshot(quadrant="B", buy_zone=True))
+
+    assert state.primary_regime == "Quadrant B / Mixed Liquidity"
+    assert state.tactical_state == "Selective accumulation"
+    assert conclusion.new_cash_action == "hold_and_wait"
+
+
+def test_quadrant_c_buy_zone_accumulates_only_in_transition() -> None:
+    state, conclusion = build_dashboard_state_with_conclusion(_snapshot(quadrant="C", buy_zone=True))
+
+    assert state.primary_regime == "Quadrant C / Liquidity Transition"
+    assert state.tactical_state == "Start buying very slowly"
+    assert conclusion.new_cash_action == "accumulate_selectively"

@@ -51,6 +51,7 @@ const MOCK_SNAPSHOT: IndicatorSnapshot = {
     fed_funds_rate: 4.75, rate_trend_1m: 'down', rate_trend_3m: 'down',
     balance_sheet_assets: 7_200_000_000_000, balance_sheet_trend_1m: 'down', balance_sheet_trend_3m: 'flat',
   },
+  plumbing: {},
   growth: {
     pmi_manufacturing: 48.9, pmi_services: 50.1, unemployment_rate: 4.2,
     unemployment_trend: 'flat', initial_claims_trend: 'up', payrolls_trend: 'down',
@@ -92,6 +93,7 @@ const DOCTRINE_FIXTURE_A_BUYZONE_STRESS: IndicatorSnapshot = {
     fed_funds_rate: 0.25, rate_trend_1m: 'down', rate_trend_3m: 'down',
     balance_sheet_assets: 7_800_000_000_000, balance_sheet_trend_1m: 'up', balance_sheet_trend_3m: 'up',
   },
+  plumbing: {},
   growth: {
     pmi_manufacturing: 51.0, pmi_services: 52.0, unemployment_rate: 4.2,
     unemployment_trend: 'flat', initial_claims_trend: 'flat', payrolls_trend: 'flat',

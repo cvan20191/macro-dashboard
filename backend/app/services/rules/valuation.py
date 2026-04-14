@@ -59,6 +59,9 @@ class ValuationResult:
 
 def compute_valuation(val_input: ValuationInput) -> ValuationResult:
     pe = val_input.forward_pe
+    current_year_pe = val_input.current_year_forward_pe
+    next_year_pe = val_input.next_year_forward_pe
+    selected_year = val_input.selected_year
     basis = val_input.pe_basis or "unavailable"
     source_note = val_input.pe_source_note
     basis_label = _BASIS_LABELS.get(basis, basis)
@@ -84,6 +87,9 @@ def compute_valuation(val_input: ValuationInput) -> ValuationResult:
         return ValuationResult(
             valuation=Valuation(
                 forward_pe=None,
+                current_year_forward_pe=current_year_pe,
+                next_year_forward_pe=next_year_pe,
+                selected_year=selected_year,
                 zone="Neutral",
                 zone_label="Data unavailable",
                 buy_zone_low=BUY_ZONE_LOW,
@@ -134,6 +140,9 @@ def compute_valuation(val_input: ValuationInput) -> ValuationResult:
 
     valuation = Valuation(
         forward_pe=pe,
+        current_year_forward_pe=current_year_pe,
+        next_year_forward_pe=next_year_pe,
+        selected_year=selected_year,
         zone=zone,
         zone_label=label,
         buy_zone_low=BUY_ZONE_LOW,

@@ -43,7 +43,24 @@ export interface FedChessboard {
   policy_stance?: string          // "easy" | "middle" | "restrictive"
   rate_impulse?: string           // "easing" | "stable" | "tightening"
   balance_sheet_direction?: string // "expanding" | "flat_or_mixed" | "contracting"
+  balance_sheet_pace?: string
   transition_tag?: string         // "Improving" | "Stable" | "Deteriorating"
+}
+
+export interface LiquidityPlumbing {
+  state?: string
+  state_label?: string
+  reserves_total?: number
+  reserves_trend_1m?: string
+  reserves_buffer_ratio?: number
+  repo_total?: number
+  repo_trend_1m?: string
+  repo_spike_ratio?: number
+  reverse_repo_total?: number
+  reverse_repo_trend_1m?: string
+  reverse_repo_buffer_ratio?: number
+  balance_sheet_expansion_not_qe?: boolean
+  caution_note?: string | null
 }
 
 export interface StagflationTrap {
@@ -81,6 +98,9 @@ export interface ValuationConstituent {
 
 export interface Valuation {
   forward_pe?: number
+  current_year_forward_pe?: number
+  next_year_forward_pe?: number
+  selected_year?: number
   zone?: string
   zone_label?: string
   buy_zone_low?: number
@@ -145,6 +165,8 @@ export interface DashboardState {
   as_of?: string
   data_freshness: DataFreshness
   primary_regime: string
+  tactical_state?: string | null
+  legacy_regime_label?: string | null
   secondary_overlays: string[]
   confidence: string
   evidence_confidence?: string
@@ -159,6 +181,7 @@ export interface DashboardState {
     reasons?: string[]
   }
   fed_chessboard?: FedChessboard
+  liquidity_plumbing?: LiquidityPlumbing
   stagflation_trap?: StagflationTrap
   valuation?: Valuation
   systemic_stress?: SystemicStress

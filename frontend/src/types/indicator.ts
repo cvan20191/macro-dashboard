@@ -12,6 +12,20 @@ export interface LiquidityInput {
   balance_sheet_assets?: number
   balance_sheet_trend_1m?: string
   balance_sheet_trend_3m?: string
+  rate_cycle_position?: number
+}
+
+export interface PlumbingInput {
+  total_reserves?: number
+  reserves_trend_1m?: string
+  reserves_buffer_ratio?: number
+  repo_total?: number
+  repo_trend_1m?: string
+  repo_spike_ratio?: number
+  reverse_repo_total?: number
+  reverse_repo_trend_1m?: string
+  reverse_repo_buffer_ratio?: number
+  walcl_trend_1m?: string
 }
 
 export interface GrowthInput {
@@ -34,6 +48,9 @@ export interface InflationInput {
 
 export interface ValuationInput {
   forward_pe?: number
+  current_year_forward_pe?: number
+  next_year_forward_pe?: number
+  selected_year?: number
   basis?: string
   basis_label?: string
   pe_basis?: string
@@ -72,6 +89,7 @@ export interface IndicatorSnapshot {
   as_of?: string
   data_freshness: DataFreshnessInput
   liquidity: LiquidityInput
+  plumbing: PlumbingInput
   growth: GrowthInput
   inflation: InflationInput
   valuation: ValuationInput

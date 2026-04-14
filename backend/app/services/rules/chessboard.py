@@ -80,39 +80,52 @@ def _policy_stance(rate: float | None, cycle_pos: float | None) -> str:
 
 def _rate_impulse(liq: LiquidityInput) -> str:
     """
-    Secondary directional signal for the transition tag.
-    Returns 'easing' | 'stable' | 'tightening' | 'mixed'.
-    Uses 1m trend as primary; 3m as confirmation.
+    Speaker-faithful timing:
+    - 3m trend defines the regime path
+    - 1m trend only confirms or creates ambiguity
+    - 1m noise must not create a new quadrant by itself
     """
     t1 = (liq.rate_trend_1m or "").lower()
     t3 = (liq.rate_trend_3m or "").lower()
 
-    if {t1, t3} == {"up", "down"}:
-        return "mixed"
-    if t1 == "down" or t3 == "down":
-        return "easing"
-    if t1 == "up" or t3 == "up":
-        return "tightening"
+    if t3 == "down":
+        return "mixed" if t1 == "up" else "easing"
+    if t3 == "up":
+        return "mixed" if t1 == "down" else "tightening"
+    if t3 == "flat":
+        return "stable"
     return "stable"
 
 
 def _bs_direction(liq: LiquidityInput) -> str:
     """
-    Classify balance sheet direction as 'expanding' | 'flat_or_mixed' | 'contracting'.
+    3m trend defines the medium-term balance-sheet direction.
+    1m does not override it by itself.
+    """
+    b3 = (liq.balance_sheet_trend_3m or "").lower()
 
-    Mixed-signal-aware: if 1m and 3m disagree, returns 'flat_or_mixed'
-    rather than letting one noisy trend dominate.
+    if b3 == "up":
+        return "expanding"
+    if b3 == "down":
+        return "contracting"
+    return "flat_or_mixed"
+
+
+def _bs_pace(liq: LiquidityInput) -> str:
+    """
+    Distinguish 'still contracting, but slower' from actual expansion.
     """
     b1 = (liq.balance_sheet_trend_1m or "").lower()
     b3 = (liq.balance_sheet_trend_3m or "").lower()
 
-    has_up = b1 == "up" or b3 == "up"
-    has_down = b1 == "down" or b3 == "down"
-
-    if has_up and not has_down:
-        return "expanding"
-    if has_down and not has_up:
-        return "contracting"
+    if b3 == "down":
+        if b1 in {"flat", "up"}:
+            return "contracting_slower"
+        return "contracting_same_or_faster"
+    if b3 == "up":
+        if b1 in {"flat", "down"}:
+            return "expanding_slower"
+        return "expanding_same_or_faster"
     return "flat_or_mixed"
 
 
@@ -134,6 +147,7 @@ def compute_chessboard(liq: LiquidityInput) -> ChessboardResult:
     stance = _policy_stance(liq.fed_funds_rate, liq.rate_cycle_position)
     impulse = _rate_impulse(liq)
     bs_dir = _bs_direction(liq)
+    bs_pace = _bs_pace(liq)
 
     # ── Primary Quadrant (strict directional doctrine map) ───────────────────
     if impulse == "easing" and bs_dir == "expanding":
@@ -156,17 +170,22 @@ def compute_chessboard(liq: LiquidityInput) -> ChessboardResult:
     if quadrant == "Unknown":
         transition_tag = "Stable"
     else:
-        supportive = impulse == "easing" or (
-            bs_dir == "expanding" and quadrant in ("B", "C")
-        )
-        adverse = impulse == "tightening" or (
-            bs_dir == "contracting" and quadrant in ("C", "D")
-        )
-
-        if supportive and not adverse:
+        if quadrant == "A":
             transition_tag = "Improving"
-        elif adverse and not supportive:
-            transition_tag = "Deteriorating"
+        elif quadrant == "B":
+            transition_tag = "Stable"
+        elif quadrant == "C":
+            if bs_pace == "contracting_slower":
+                transition_tag = "Improving"
+            elif impulse == "mixed":
+                transition_tag = "Stable"
+            else:
+                transition_tag = "Stable"
+        elif quadrant == "D":
+            if bs_pace == "contracting_slower" and impulse in {"stable", "mixed"}:
+                transition_tag = "Stable"
+            else:
+                transition_tag = "Deteriorating"
         else:
             transition_tag = "Stable"
 
@@ -174,7 +193,7 @@ def compute_chessboard(liq: LiquidityInput) -> ChessboardResult:
     # Derived from quadrant + transition_tag rather than raw trend strings,
     # keeping downstream logic aligned with the new two-layer model.
     liquidity_improving = quadrant == "A" or (
-        quadrant in {"B", "C"} and transition_tag == "Improving"
+        quadrant == "C" and transition_tag == "Improving"
     )
     liquidity_tight = quadrant == "D" or (
         quadrant == "C" and transition_tag == "Deteriorating"
@@ -194,6 +213,7 @@ def compute_chessboard(liq: LiquidityInput) -> ChessboardResult:
         policy_stance=stance,
         rate_impulse=impulse,
         balance_sheet_direction=bs_dir,
+        balance_sheet_pace=bs_pace,
         transition_tag=transition_tag,
     )
 

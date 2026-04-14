@@ -14,9 +14,9 @@ export function zoneColor(zone: string | undefined): ColorKey {
 export function regimeColor(regime: string | undefined): ColorKey {
   if (!regime) return 'muted'
   const r = regime.toLowerCase()
-  if (r.includes('max liquidity') || r.includes('buy-the-dip')) return 'green'
-  if (r.includes('transition') || r.includes('mixed')) return 'blue'
-  if (r.includes('stagflation') || r.includes('valuation')) return 'yellow'
+  if (r.includes('quadrant a') || r.includes('max liquidity') || r.includes('buy-the-dip')) return 'green'
+  if (r.includes('quadrant c') || r.includes('transition') || r.includes('mixed')) return 'blue'
+  if (r.includes('quadrant b') || r.includes('stagflation') || r.includes('valuation')) return 'yellow'
   if (r.includes('crash') || r.includes('defensive') || r.includes('illiquid')) return 'red'
   return 'blue'
 }

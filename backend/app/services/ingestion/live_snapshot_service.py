@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from functools import partial
 
 from app.doctrine import default_confidence_weight
@@ -28,7 +28,7 @@ from app.services.ingestion.series_map import (
 )
 from app.services.providers.base import FetchResult, ProviderError
 from app.services.providers.cpi_provider import fetch_cpi_components
-from app.services.providers.fmp_client import compute_mag7_basket
+from app.services.providers.fmp_client import fetch_mag7_constituent_payloads
 from app.services.providers.fred_client import fetch_series
 from app.services.providers.pmi_provider import fetch_pmi_manufacturing, fetch_pmi_services
 from app.services.providers.yahoo_client import fetch_pe_ratio_proxy, fetch_ticker
@@ -36,12 +36,13 @@ from app.services.catalysts.config_loader import load_catalyst_config
 from app.services.catalysts.engine import build_catalyst_state
 from app.services.macro_expectations_service import get_macro_expectations_state
 from app.services.rules.dashboard_state_builder import build_dashboard_state_with_conclusion
+from app.services.rules.speaker_forward_pe import compute_speaker_forward_pe
 from app.services.summary_engine import generate_summary
 
 logger = logging.getLogger(__name__)
 
 # Bump when snapshot shape / provider mix changes so TTL cache + disk recovery are not stale.
-_LIVE_SNAPSHOT_CACHE_VERSION = 7  # bumped: FRED economic-date freshness windows (series_map)
+_LIVE_SNAPSHOT_CACHE_VERSION = 8  # bumped: quadrant-first valuation/plumbing snapshot shape
 # Same-day in-memory cache for successful FMP Mag 7 valuation results only.
 _FMP_VALUATION_DAY_CACHE: dict[str, FetchResult] = {}
 
@@ -79,6 +80,9 @@ _FRED_FETCH_MAP: dict[str, tuple[str, str, int, int]] = {
     # a cycle position for the chessboard's policy stance inference.
     "fed_funds_rate":    (FRED_SERIES["fed_funds_rate"],   "Fed Funds Upper Bound",        5,   1100),
     "balance_sheet":     (FRED_SERIES["balance_sheet"],    "Fed Balance Sheet",            10,  120),
+    "total_reserves":    (FRED_SERIES["total_reserves"],   "Total Reserves",               35,  365),
+    "repo_total":        (FRED_SERIES["repo_total"],       "Total Repo Operations",        5,   240),
+    "reverse_repo_total": (FRED_SERIES["reverse_repo_total"], "Total Reverse Repo Operations", 5, 240),
     "unemployment_rate": (FRED_SERIES["unemployment_rate"], "Unemployment Rate",           35,  120),
     "initial_claims":    (FRED_SERIES["initial_claims"],   "Initial Jobless Claims",       10,  120),
     "nonfarm_payrolls":  (FRED_SERIES["nonfarm_payrolls"], "Nonfarm Payrolls",             40,  120),
@@ -241,8 +245,43 @@ def _fetch_valuation(timeout: int, force_refresh: bool = False) -> FetchResult:
 
     # Try FMP Mag 7 basket
     try:
-        result = compute_mag7_basket(api_key=fmp_key, timeout=timeout)
-        if result.value is not None:
+        payloads = fetch_mag7_constituent_payloads(api_key=fmp_key, timeout=timeout)
+        basket = compute_speaker_forward_pe(payloads, as_of=date.today())
+        if basket.valid and basket.speaker_forward_pe is not None:
+            today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+            result = FetchResult(
+                value=basket.speaker_forward_pe,
+                observed_at=today,
+                series=[],
+                provider="FMP",
+                series_id="MAG7_BASKET",
+                series_name="Mag 7 Forward P/E Basket",
+                frequency="daily",
+                status="fresh",
+                note=basket.note,
+                source_class="licensed",
+                confidence_weight=default_confidence_weight("licensed"),
+                release_date=today,
+                last_revised_at=today,
+                staleness_bucket="fresh",
+                extra={
+                    "pe_basis": "forward",
+                    "metric_name": "Mag 7 Forward P/E",
+                    "object_label": "Mag 7 Basket",
+                    "provider": "fmp",
+                    "coverage_count": basket.coverage_count,
+                    "coverage_ratio": basket.coverage_ratio,
+                    "signal_mode": basket.signal_mode,
+                    "basis_confidence": basket.basis_confidence,
+                    "estimate_as_of": today,
+                    "horizon_label": basket.horizon_label,
+                    "horizon_coverage_ratio": basket.horizon_coverage_ratio,
+                    "current_year_forward_pe": basket.current_year_forward_pe,
+                    "next_year_forward_pe": basket.next_year_forward_pe,
+                    "selected_year": basket.selected_year,
+                    "constituents": basket.constituents,
+                },
+            )
             _FMP_VALUATION_DAY_CACHE[cache_day] = result
             logger.info("Valuation: FMP Mag 7 basket succeeded (P/E=%.2f)", result.value)
             return result

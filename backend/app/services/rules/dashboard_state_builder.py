@@ -31,6 +31,7 @@ from app.schemas.dashboard_state import DataFreshness, DashboardState, ReasonedT
 from app.schemas.indicator_snapshot import IndicatorSnapshot
 from app.schemas.playbook_conclusion import PlaybookConclusion
 from app.services.rules.chessboard import ChessboardResult, compute_chessboard
+from app.services.rules.liquidity_plumbing import LiquidityPlumbingResult, compute_liquidity_plumbing
 from app.services.rules.playbook_conclusion import build_playbook_conclusion
 from app.services.rules.rally import RallyResult, compute_rally
 from app.services.rules.regime import RegimeResult, compute_regime
@@ -52,6 +53,7 @@ class _RuleOutputs:
     cb: ChessboardResult
     stag: StagflationResult
     val: ValuationResult
+    plumbing: LiquidityPlumbingResult
     stress: StressResult
     dollar: object
     rally: RallyResult
@@ -81,35 +83,38 @@ def _run_rules(snapshot: IndicatorSnapshot) -> _RuleOutputs:
     # ── Step 3: Valuation ─────────────────────────────────────────────────────
     val = compute_valuation(snapshot.valuation)
 
-    # ── Step 4: Systemic Stress ───────────────────────────────────────────────
+    # ── Step 4: Liquidity plumbing overlay ────────────────────────────────────
+    plumbing = compute_liquidity_plumbing(snapshot.plumbing)
+
+    # ── Step 5: Systemic Stress ───────────────────────────────────────────────
     stress = compute_stress(snapshot.systemic_stress)
 
-    # ── Step 5: Dollar Context ────────────────────────────────────────────────
+    # ── Step 6: Dollar Context ────────────────────────────────────────────────
     dollar = compute_dollar(snapshot.dollar_context)
 
-    # ── Step 6: Rally Conditions ──────────────────────────────────────────────
+    # ── Step 7: Rally Conditions ──────────────────────────────────────────────
     rally = compute_rally(cb, stag, val, stress, snapshot.policy_support)
 
-    # ── Step 7: Regime ────────────────────────────────────────────────────────
+    # ── Step 8: Regime ────────────────────────────────────────────────────────
     regime = compute_regime(cb, stag, val, stress, dollar, rally)
 
-    # ── Step 8: Top Watchpoints ───────────────────────────────────────────────
+    # ── Step 9: Top Watchpoints ───────────────────────────────────────────────
     watchpoints = compute_watchpoints(
-        cb, stag, val, stress, dollar, regime.primary_regime
+        cb, stag, val, stress, dollar, regime.primary_regime, plumbing
     )
     watchpoint_details = compute_watchpoint_details(
-        cb, stag, val, stress, dollar, regime.primary_regime
+        cb, stag, val, stress, dollar, regime.primary_regime, plumbing
     )
 
-    # ── Step 9: What Changed ──────────────────────────────────────────────────
+    # ── Step 10: What Changed ─────────────────────────────────────────────────
     what_changed = compute_what_changed(snapshot, cb, stag, val, stress)
     what_changed_details = compute_what_changed_details(snapshot, cb, stag, val, stress)
 
-    # ── Step 10: What Changes the Call ────────────────────────────────────────
+    # ── Step 11: What Changes the Call ────────────────────────────────────────
     what_changes_call = compute_what_changes_call(regime, val, stag, stress, cb)
     what_changes_call_details = compute_what_changes_call_details(regime, val, stag, stress, cb)
 
-    # ── Step 11: Freshness ────────────────────────────────────────────────────
+    # ── Step 12: Freshness ────────────────────────────────────────────────────
     freshness = DataFreshness(
         overall_status=snapshot.data_freshness.overall_status or "unknown",
         stale_series=snapshot.data_freshness.stale_series,
@@ -119,6 +124,7 @@ def _run_rules(snapshot: IndicatorSnapshot) -> _RuleOutputs:
         cb=cb,
         stag=stag,
         val=val,
+        plumbing=plumbing,
         stress=stress,
         dollar=dollar,
         rally=rally,
@@ -149,6 +155,7 @@ def _derive_confidences(snapshot: IndicatorSnapshot, r: _RuleOutputs) -> tuple[s
         snapshot.growth.unemployment_rate is not None,
         snapshot.valuation.forward_pe is not None,
         r.stag.trap.trap_state != "unknown",
+        snapshot.plumbing.total_reserves is not None or snapshot.plumbing.repo_total is not None,
     ]
     evidence_score = sum(1 for item in evidence_signals if item) / len(evidence_signals)
 
@@ -159,6 +166,8 @@ def _derive_confidences(snapshot: IndicatorSnapshot, r: _RuleOutputs) -> tuple[s
         doctrine_score -= 0.15
     if snapshot.growth.pmi_manufacturing is None:
         doctrine_score -= 0.1
+    if r.plumbing.state in {"elevated", "severe"}:
+        doctrine_score -= 0.05
 
     action_score = doctrine_score
     if r.val.valuation.signal_mode != "actionable":
@@ -167,6 +176,10 @@ def _derive_confidences(snapshot: IndicatorSnapshot, r: _RuleOutputs) -> tuple[s
         action_score -= 0.1
     if r.stress.stress.proxy_warning_active:
         action_score -= 0.05
+    if r.plumbing.state == "elevated":
+        action_score -= 0.05
+    elif r.plumbing.state == "severe":
+        action_score -= 0.1
 
     return (
         _score_to_confidence(max(0.0, min(1.0, evidence_score))),
@@ -228,6 +241,8 @@ def _assemble_state(snapshot: IndicatorSnapshot, r: _RuleOutputs) -> DashboardSt
         as_of=snapshot.as_of,
         data_freshness=r.freshness,
         primary_regime=r.regime.primary_regime,
+        tactical_state=r.regime.tactical_state,
+        legacy_regime_label=r.regime.legacy_regime_label,
         secondary_overlays=r.regime.secondary_overlays,
         confidence=r.regime.confidence,
         evidence_confidence=evidence_confidence,
@@ -236,6 +251,7 @@ def _assemble_state(snapshot: IndicatorSnapshot, r: _RuleOutputs) -> DashboardSt
         current_posture=r.regime.current_posture,
         regime_transition=_derive_regime_transition(r),
         fed_chessboard=r.cb.chessboard,
+        liquidity_plumbing=r.plumbing.plumbing,
         stagflation_trap=r.stag.trap,
         valuation=r.val.valuation,
         systemic_stress=r.stress.stress,

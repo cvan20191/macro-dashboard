@@ -22,7 +22,24 @@ class FedChessboard(BaseModel):
     policy_stance: str | None = None           # "easy" | "middle" | "restrictive"
     rate_impulse: str | None = None            # "easing" | "stable" | "tightening" | "mixed"
     balance_sheet_direction: str | None = None # "expanding" | "flat_or_mixed" | "contracting"
+    balance_sheet_pace: str | None = None      # "contracting_slower" | "contracting_same_or_faster" | ...
     transition_tag: str | None = None          # "Improving" | "Stable" | "Deteriorating"
+
+
+class LiquidityPlumbing(BaseModel):
+    state: str = "unknown"  # normal | elevated | severe | unknown
+    state_label: str = "Unknown"
+    reserves_total: float | None = None
+    reserves_trend_1m: str | None = None
+    reserves_buffer_ratio: float | None = None
+    repo_total: float | None = None
+    repo_trend_1m: str | None = None
+    repo_spike_ratio: float | None = None
+    reverse_repo_total: float | None = None
+    reverse_repo_trend_1m: str | None = None
+    reverse_repo_buffer_ratio: float | None = None
+    balance_sheet_expansion_not_qe: bool = False
+    caution_note: str | None = None
 
 
 class StagflationTrap(BaseModel):
@@ -61,6 +78,9 @@ class ValuationConstituent(BaseModel):
 
 class Valuation(BaseModel):
     forward_pe: float | None = None
+    current_year_forward_pe: float | None = None
+    next_year_forward_pe: float | None = None
+    selected_year: int | None = None
     zone: str | None = None
     zone_label: str | None = None
     buy_zone_low: float | None = None
@@ -140,6 +160,8 @@ class DashboardState(BaseModel):
     as_of: str | None = None
     data_freshness: DataFreshness = Field(default_factory=DataFreshness)
     primary_regime: str
+    tactical_state: str | None = None
+    legacy_regime_label: str | None = None
     secondary_overlays: list[str] = Field(default_factory=list)
     confidence: str = "Medium"
     evidence_confidence: str = "Medium"
@@ -148,6 +170,7 @@ class DashboardState(BaseModel):
     current_posture: str
     regime_transition: RegimeTransition | None = None
     fed_chessboard: FedChessboard | None = None
+    liquidity_plumbing: LiquidityPlumbing | None = None
     stagflation_trap: StagflationTrap | None = None
     valuation: Valuation | None = None
     systemic_stress: SystemicStress | None = None

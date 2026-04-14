@@ -116,31 +116,26 @@ def _derive_new_cash_action(
     stag: StagflationResult,
     stress: StressResult,
 ) -> NewCashAction:
-    # Precedence contract:
-    # 1) severe stress defensive override
-    # 2) trap + tight liquidity
-    # 3) minimum-liquidity quadrant (D) — doctrine: ~80% cash / sidelines
-    # 4) stretched valuation pause rule
-    # 5) buy-zone accumulation
-    # 6) max-liquidity quadrant (A) — doctrine: low cash / active deployment
-    # 7) improving-liquidity selectivity
-    # 8) default hold
     if cb.quadrant == "Unknown":
         return "hold_and_wait"
-    if cb.quadrant == "A" and val.can_support_buy_zone and stag.trap.trap_state == "false":
-        return "accumulate_selectively"
     if _defensive_override_needed(cb, val, stag, stress):
         return "defensive_preservation"
     if cb.quadrant == "D":
         return "defensive_preservation"
     if val.can_pause_new_buying:
         return "pause_new_buying"
-    if val.can_support_buy_zone:
+    if cb.quadrant == "A" and not stag.trap.active and not stress.stress_severe:
         return "accumulate_selectively"
-    if cb.quadrant == "A":
+    if (
+        cb.quadrant == "C"
+        and val.can_support_buy_zone
+        and cb.chessboard.transition_tag in {"Improving", "Stable"}
+        and not stag.trap.active
+        and not stress.stress_severe
+    ):
         return "accumulate_selectively"
-    if cb.liquidity_improving:
-        return "accumulate_selectively"
+    if cb.quadrant == "B":
+        return "hold_and_wait"
     return "hold_and_wait"
 
 
@@ -311,6 +306,7 @@ def build_playbook_conclusion(
         warning_urgency=_derive_warning_urgency(cb, val, stag, stress),
         leniency_notes=_derive_leniency_notes(cb, val, stress, regime),
         why_now=_build_why_now(cb, val, stag, stress, rally),
+        tactical_overlay_label=regime.tactical_state,
         reentry_condition=_derive_reentry_condition(val, cb),
         exit_condition=_derive_exit_condition(val, cb, stag),
     )

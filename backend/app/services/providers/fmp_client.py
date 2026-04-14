@@ -19,9 +19,7 @@ from datetime import datetime, timezone
 
 import httpx
 
-from app.doctrine import default_confidence_weight
-from app.services.ingestion.series_map import PROVIDER_FMP
-from app.services.providers.base import FetchResult, ProviderError
+from app.services.providers.base import ProviderError
 
 logger = logging.getLogger(__name__)
 
@@ -32,10 +30,6 @@ logger = logging.getLogger(__name__)
 FMP_BASE = "https://financialmodelingprep.com/stable"
 
 MAG7_TICKERS: list[str] = ["AAPL", "MSFT", "NVDA", "AMZN", "GOOGL", "META", "TSLA"]
-
-MIN_CONSTITUENTS = 5          # require at least 5 valid members
-MIN_COVERAGE_RATIO = 0.80     # require ≥80 % market-cap coverage of total Mag 7
-SPEAKER_NEXT_FY_SWITCH_DAYS = 100
 
 # ---------------------------------------------------------------------------
 # Internal helpers — field-name adapter
@@ -138,50 +132,6 @@ def _fmp_get(path: str, params: dict, timeout: int) -> list | dict:
 
 
 # ---------------------------------------------------------------------------
-# EPS estimate selector
-# ---------------------------------------------------------------------------
-
-def select_speaker_forward_estimate(
-    estimates: list[dict],
-    *,
-    now: datetime | None = None,
-    switch_days: int = SPEAKER_NEXT_FY_SWITCH_DAYS,
-) -> tuple[float | None, datetime | None, str | None, float | None, float | None]:
-    """
-    Select speaker-faithful forward EPS from annual analyst estimates.
-
-    Use the current full-year expected EPS by default, but near fiscal year-end
-    switch to the next full-year estimate rather than blending FY1/FY2.
-    """
-    ts = now or datetime.now(timezone.utc)
-    candidates: list[tuple[datetime, float]] = []
-
-    for row in estimates:
-        row_date = _get_estimate_date(row)
-        if row_date is None:
-            continue
-        if row_date <= ts:
-            continue
-        eps = _get_forward_eps(row)
-        if eps is None:
-            continue
-        candidates.append((row_date, eps))
-
-    if not candidates:
-        return None, None, None, None, None
-
-    candidates.sort(key=lambda t: t[0])
-    fy1_date, fy1_eps = candidates[0]
-    fy2_date, fy2_eps = candidates[1] if len(candidates) > 1 else (None, None)
-    days_to_fy1 = (fy1_date.date() - ts.date()).days
-
-    if days_to_fy1 <= switch_days and fy2_eps is not None and fy2_date is not None:
-        return fy2_eps, fy2_date, "next_fy", fy1_eps, fy2_eps
-
-    return fy1_eps, fy1_date, "current_fy", fy1_eps, fy2_eps
-
-
-# ---------------------------------------------------------------------------
 # FMP data fetchers
 # ---------------------------------------------------------------------------
 
@@ -228,255 +178,53 @@ def fetch_analyst_estimates(ticker: str, api_key: str, timeout: int) -> list[dic
 
 
 # ---------------------------------------------------------------------------
-# Basket computation
+# Raw constituent payloads for the deterministic rule layer
 # ---------------------------------------------------------------------------
 
-def compute_mag7_basket(
+def _annual_eps_by_year(estimates: list[dict]) -> dict[int, float]:
+    out: dict[int, float] = {}
+    for row in estimates:
+        row_date = _get_estimate_date(row)
+        eps = _get_forward_eps(row)
+        if row_date is None or eps is None:
+            continue
+        out[row_date.year] = eps
+    return out
+
+
+def fetch_mag7_constituent_payloads(
     api_key: str,
     timeout: int = 20,
     tickers: list[str] | None = None,
-) -> FetchResult:
-    """
-    Compute the Mag 7 market-cap-weighted forward P/E basket using FMP data.
-
-    Returns a FetchResult with extra dict containing:
-      pe_basis, metric_name, object_label, provider, coverage_count, coverage_ratio
-
-    Raises ProviderError if FMP calls fail hard (caller handles fallback).
-    Returns a FetchResult with status="missing" if coverage is insufficient.
-    """
+) -> list[dict]:
     mag7 = tickers or MAG7_TICKERS
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
-    # --- 1. Batch profile fetch ---
     try:
         profiles = fetch_profiles_batch(mag7, api_key, timeout)
     except ProviderError as exc:
         raise ProviderError(f"FMP profile batch failed: {exc}") from exc
 
-    # --- 2. Analyst estimates (sequential per ticker) ---
-    total_market_cap = 0.0
-    sum_market_cap_valid = 0.0
-    sum_forward_earnings = 0.0
-    weighted_basis_confidence = 0.0
-    weighted_horizon_coverage = 0.0
-    valid_count = 0
-    skipped: list[str] = []
-    # Per-ticker detail for UI display
-    constituents: list[dict] = []
-
+    payloads: list[dict] = []
     for ticker in mag7:
         profile = profiles.get(ticker, {})
         mktcap = _get_market_cap(profile)
         shares = _get_shares(profile)
         price = _get_price(profile)
 
-        if mktcap is not None:
-            total_market_cap += mktcap
-
-        if mktcap is None or shares is None:
-            logger.debug("FMP Mag7: skipping %s — no market cap or shares", ticker)
-            skipped.append(f"{ticker}(no_mktcap_or_shares)")
-            constituents.append({
-                "ticker": ticker,
-                "price": None,
-                "forward_eps": None,
-                "forward_pe": None,
-                "fy1_eps": None,
-                "fy2_eps": None,
-                "shares": None,
-                "fiscal_year_end": None,
-                "estimate_as_of": today,
-                "basis_confidence": None,
-            })
-            continue
-
         try:
             estimates = fetch_analyst_estimates(ticker, api_key, timeout)
         except ProviderError as exc:
             logger.warning("FMP analyst-estimates failed for %s: %s", ticker, exc)
-            skipped.append(f"{ticker}(estimates_error)")
-            constituents.append({
+            estimates = []
+        payloads.append(
+            {
                 "ticker": ticker,
                 "price": price,
-                "forward_eps": None,
-                "forward_pe": None,
-                "fy1_eps": None,
-                "fy2_eps": None,
-                "shares": round(shares, 2) if shares is not None else None,
-                "fiscal_year_end": None,
+                "shares": shares,
+                "market_cap": mktcap,
+                "annual_eps_by_year": _annual_eps_by_year(estimates),
                 "estimate_as_of": today,
-                "basis_confidence": None,
-            })
-            continue
-
-        selected_eps, selected_date, horizon_label, fy1_eps, fy2_eps = select_speaker_forward_estimate(
-            estimates
+            }
         )
-        if selected_eps is None:
-            logger.debug("FMP Mag7: skipping %s — no speaker-style forward EPS estimate", ticker)
-            skipped.append(f"{ticker}(no_forward_eps)")
-            constituents.append({
-                "ticker": ticker,
-                "price": price,
-                "forward_eps": None,
-                "forward_pe": None,
-                "fy1_eps": None if fy1_eps is None else round(fy1_eps, 4),
-                "fy2_eps": None if fy2_eps is None else round(fy2_eps, 4),
-                "shares": round(shares, 2) if shares is not None else None,
-                "fiscal_year_end": None,
-                "estimate_as_of": today,
-                "basis_confidence": None,
-            })
-            continue
-
-        forward_earnings = selected_eps * shares
-        if not _positive_finite(forward_earnings):
-            skipped.append(f"{ticker}(non_positive_earnings)")
-            constituents.append({
-                "ticker": ticker,
-                "price": price,
-                "forward_eps": round(selected_eps, 4),
-                "forward_pe": None,
-                "fy1_eps": None if fy1_eps is None else round(fy1_eps, 4),
-                "fy2_eps": None if fy2_eps is None else round(fy2_eps, 4),
-                "shares": round(shares, 2),
-                "fiscal_year_end": selected_date.strftime("%Y-%m-%d") if selected_date is not None else None,
-                "estimate_as_of": today,
-                "basis_confidence": 0.0,
-            })
-            continue
-
-        basis_confidence = 1.0 if horizon_label == "next_fy" else 0.95
-        fwd_pe = (
-            round(price / selected_eps, 2)
-            if price is not None and _positive_finite(price / selected_eps)
-            else None
-        )
-        sum_market_cap_valid += mktcap
-        sum_forward_earnings += forward_earnings
-        weighted_basis_confidence += mktcap * basis_confidence
-        weighted_horizon_coverage += mktcap * (1.0 if fy2_eps is not None else 0.0)
-        valid_count += 1
-        constituents.append({
-            "ticker": ticker,
-            "price": price,
-            "forward_eps": round(selected_eps, 4),
-            "forward_pe": fwd_pe,
-            "fy1_eps": None if fy1_eps is None else round(fy1_eps, 4),
-            "fy2_eps": None if fy2_eps is None else round(fy2_eps, 4),
-            "shares": round(shares, 2),
-            "fiscal_year_end": selected_date.strftime("%Y-%m-%d") if selected_date is not None else None,
-            "estimate_as_of": today,
-            "basis_confidence": round(basis_confidence, 2),
-        })
-        logger.debug(
-            "FMP Mag7: %s — mktcap=%.2fB fwd_eps=%.2f pe=%.1f",
-            ticker,
-            mktcap / 1e9,
-            selected_eps,
-            fwd_pe or 0,
-        )
-
-    # --- 3. Coverage check ---
-    coverage_ratio = (
-        sum_market_cap_valid / total_market_cap
-        if total_market_cap > 0
-        else 0.0
-    )
-
-    if valid_count < MIN_CONSTITUENTS or coverage_ratio < MIN_COVERAGE_RATIO:
-        note = (
-            f"Mag 7 basket coverage insufficient: {valid_count}/{len(mag7)} constituents, "
-            f"{coverage_ratio:.0%} market-cap coverage. Skipped: {', '.join(skipped) or 'none'}. "
-            "Falling back to Yahoo proxy."
-        )
-        logger.warning("FMP Mag7 basket: %s", note)
-        return FetchResult(
-            value=None,
-            observed_at=None,
-            series=[],
-            provider=PROVIDER_FMP,
-            series_id="MAG7_BASKET",
-            series_name="Mag 7 Forward P/E Basket",
-            frequency="daily",
-            status="missing",
-            note=note,
-            source_class="licensed",
-            confidence_weight=default_confidence_weight("licensed"),
-            release_date=today,
-            staleness_bucket="missing",
-            extra={
-                "pe_basis": "unavailable",
-                "metric_name": "Mag 7 Forward P/E",
-                "object_label": "Mag 7 Basket",
-                "provider": "fmp",
-                "coverage_count": valid_count,
-                "coverage_ratio": round(coverage_ratio, 4),
-                "signal_mode": "directional_only",
-                "basis_confidence": None,
-                "estimate_as_of": today,
-                "horizon_label": "speaker_fy_shift",
-                "horizon_coverage_ratio": 0.0,
-                "constituents": constituents,
-            },
-        )
-
-    # --- 4. Compute basket P/E ---
-    basket_pe = sum_market_cap_valid / sum_forward_earnings
-    basis_confidence = (
-        round(weighted_basis_confidence / sum_market_cap_valid, 4)
-        if sum_market_cap_valid > 0
-        else None
-    )
-    horizon_coverage_ratio = (
-        round(weighted_horizon_coverage / sum_market_cap_valid, 4)
-        if sum_market_cap_valid > 0
-        else 0.0
-    )
-    signal_mode = "actionable" if basis_confidence is not None and basis_confidence >= 0.85 else "directional_only"
-
-    if not _positive_finite(basket_pe):
-        raise ProviderError("Mag 7 basket P/E computation produced a non-finite result")
-
-    note = (
-        f"Mag 7 market-cap-weighted forward P/E — {valid_count}/{len(mag7)} constituents, "
-        f"{coverage_ratio:.0%} market-cap coverage "
-        "(FMP analyst estimates, speaker-style annual horizon selection)"
-    )
-    if skipped:
-        note += f". Excluded: {', '.join(skipped)}"
-
-    logger.info("FMP Mag7 basket P/E = %.2f (%d constituents, %.0f%% coverage)",
-                basket_pe, valid_count, coverage_ratio * 100)
-
-    return FetchResult(
-        value=basket_pe,
-        observed_at=today,
-        series=[],
-        provider=PROVIDER_FMP,
-        series_id="MAG7_BASKET",
-        series_name="Mag 7 Forward P/E Basket",
-        frequency="daily",
-        status="fresh",
-        note=note,
-        source_class="licensed",
-        confidence_weight=default_confidence_weight("licensed"),
-        release_date=today,
-        last_revised_at=today,
-        staleness_bucket="fresh",
-        extra={
-            "pe_basis": "forward",
-            "metric_name": "Mag 7 Forward P/E",
-            "object_label": "Mag 7 Basket",
-            "provider": "fmp",
-            "coverage_count": valid_count,
-            "coverage_ratio": round(coverage_ratio, 4),
-            "signal_mode": signal_mode,
-            "basis_confidence": basis_confidence,
-            "estimate_as_of": today,
-            "horizon_label": "speaker_fy_shift",
-            "horizon_coverage_ratio": horizon_coverage_ratio,
-            "constituents": constituents,
-        },
-    )
+    return payloads

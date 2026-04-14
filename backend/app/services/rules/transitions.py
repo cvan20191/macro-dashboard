@@ -120,7 +120,7 @@ def compute_what_changes_call_details(
     """Return exactly 3 trigger bullets that would change the current posture."""
     bullets: list[ReasonedText] = []
 
-    regime = regime_result.primary_regime
+    regime = regime_result.legacy_regime_label or regime_result.primary_regime
 
     # Valuation trigger
     _is_proxy = val.valuation.is_fallback
@@ -158,7 +158,7 @@ def compute_what_changes_call_details(
     # Regime-specific additions
     if regime == "Crash Watch":
         bullets.append(ReasonedText(code="systemic_stress_stabilizes", text="Systemic stress gauges stabilize or reverse — NPL and card charge-offs stop worsening"))
-    if regime == "Max Liquidity":
+    if regime_result.primary_regime == "Quadrant A / Max Liquidity":
         bullets.append(ReasonedText(code="inflation_reaccelerates", text="Inflation re-accelerates and forces the Fed to pause or reverse cuts"))
 
     while len(bullets) < 3:

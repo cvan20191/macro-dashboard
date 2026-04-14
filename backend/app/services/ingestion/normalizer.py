@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import logging
+from statistics import median
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
@@ -23,6 +24,7 @@ from app.schemas.indicator_snapshot import (
     IndicatorSnapshot,
     InflationInput,
     LiquidityInput,
+    PlumbingInput,
     PolicySupportInput,
     SystemicStressInput,
     ValuationInput,
@@ -98,6 +100,24 @@ def _trend_by_absolute_delta(series: list[tuple[str, float]], lookback_days: int
     if delta < -threshold:
         return "down"
     return "flat"
+
+
+def _median_ratio(series: list[tuple[str, float]], lookback_days: int) -> float | None:
+    if not series:
+        return None
+    parsed = [(_parse_series_date(d), v) for d, v in series]
+    parsed = [(d, v) for d, v in parsed if d is not None and v > 0]
+    if not parsed:
+        return None
+    end_date = parsed[-1][0]
+    assert end_date is not None
+    values = [v for d, v in parsed if d is not None and d >= end_date - timedelta(days=lookback_days)]
+    if not values:
+        return None
+    baseline = median(values)
+    if baseline <= 0:
+        return None
+    return round(values[-1] / baseline, 4)
 
 
 def _rate_trend(series: list[tuple[str, float]], lookback_days: int) -> str:
@@ -269,6 +289,18 @@ def build_indicator_snapshot(
         balance_sheet_trend_3m=_trend_by_absolute_delta(bs_series, 91, _BALANCE_SHEET_DELTA_THRESHOLD),
         rate_cycle_position=_compute_cycle_position(rate_series),
     )
+    plumbing = PlumbingInput(
+        total_reserves=get_val("total_reserves"),
+        reserves_trend_1m=_trend_by_relative_change(get_series("total_reserves"), 35, 0.01),
+        reserves_buffer_ratio=_median_ratio(get_series("total_reserves"), 210),
+        repo_total=get_val("repo_total"),
+        repo_trend_1m=_trend_by_relative_change(get_series("repo_total"), 28, 0.10),
+        repo_spike_ratio=_median_ratio(get_series("repo_total"), 180),
+        reverse_repo_total=get_val("reverse_repo_total"),
+        reverse_repo_trend_1m=_trend_by_relative_change(get_series("reverse_repo_total"), 28, 0.10),
+        reverse_repo_buffer_ratio=_median_ratio(get_series("reverse_repo_total"), 180),
+        walcl_trend_1m=_trend_by_absolute_delta(bs_series, 28, _BALANCE_SHEET_DELTA_THRESHOLD),
+    )
 
     # ------------------------------------------------------------------
     # Growth
@@ -319,6 +351,9 @@ def build_indicator_snapshot(
     pe_source_note = pe_result.note if pe_result else None
     valuation = ValuationInput(
         forward_pe=get_val("forward_pe"),
+        current_year_forward_pe=_pe_extra.get("current_year_forward_pe"),
+        next_year_forward_pe=_pe_extra.get("next_year_forward_pe"),
+        selected_year=_pe_extra.get("selected_year"),
         pe_basis=pe_basis,
         pe_source_note=pe_source_note,
         metric_name=_pe_extra.get("metric_name"),
@@ -398,6 +433,7 @@ def build_indicator_snapshot(
         as_of=now_iso,
         data_freshness=data_freshness,
         liquidity=liquidity,
+        plumbing=plumbing,
         growth=growth,
         inflation=inflation,
         valuation=valuation,

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from app.schemas.dashboard_state import ReasonedText
 from app.services.rules.chessboard import ChessboardResult
+from app.services.rules.liquidity_plumbing import LiquidityPlumbingResult
 from app.services.rules.stagflation import StagflationResult
 from app.services.rules.stress import DollarResult, StressResult
 from app.services.rules.valuation import ValuationResult
@@ -20,6 +21,7 @@ def compute_watchpoint_details(
     stress: StressResult,
     dollar: DollarResult,
     regime: str,
+    plumbing: LiquidityPlumbingResult | None = None,
 ) -> list[ReasonedText]:
     """Return exactly 3 watchpoint strings ranked by current relevance."""
     candidates: list[tuple[int, str, str]] = []
@@ -120,6 +122,15 @@ def compute_watchpoint_details(
     # ── Chessboard direction ─────────────────────────────────────────────────
     if cb.liquidity_tight and cb.quadrant == "D":
         candidates.append((70, "quadrant_d_tight", "Fed Chessboard is in max illiquidity — rates elevated, balance sheet contracting"))
+    elif cb.quadrant == "C" and cb.chessboard.balance_sheet_pace == "contracting_slower":
+        candidates.append((62, "qt_still_contracting_but_slowing", "The balance sheet is still contracting, but the pace is slowing — a transition signal, not full expansion"))
+
+    # ── Plumbing overlay ─────────────────────────────────────────────────────
+    if plumbing is not None and plumbing.state in {"elevated", "severe"}:
+        if plumbing.state == "severe":
+            candidates.append((89, "repo_reserve_plumbing_stress", "Repo / reverse-repo / reserve plumbing is showing clear funding stress — treat any balance-sheet lift as plumbing support, not QE"))
+        else:
+            candidates.append((68, "repo_reserve_plumbing_caution", "Repo / reverse-repo / reserve plumbing is tightening — balance-sheet stabilization here may be support, not clean QE"))
 
     # Sort descending, deduplicate, take top 3
     candidates.sort(key=lambda x: x[0], reverse=True)
@@ -155,5 +166,6 @@ def compute_watchpoints(
     stress: StressResult,
     dollar: DollarResult,
     regime: str,
+    plumbing: LiquidityPlumbingResult | None = None,
 ) -> list[str]:
-    return [item.text for item in compute_watchpoint_details(cb, stag, val, stress, dollar, regime)]
+    return [item.text for item in compute_watchpoint_details(cb, stag, val, stress, dollar, regime, plumbing)]

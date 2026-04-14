@@ -31,6 +31,19 @@ class LiquidityInput(BaseModel):
     rate_cycle_position: float | None = None
 
 
+class PlumbingInput(BaseModel):
+    total_reserves: float | None = None
+    reserves_trend_1m: str | None = None
+    reserves_buffer_ratio: float | None = None
+    repo_total: float | None = None
+    repo_trend_1m: str | None = None
+    repo_spike_ratio: float | None = None
+    reverse_repo_total: float | None = None
+    reverse_repo_trend_1m: str | None = None
+    reverse_repo_buffer_ratio: float | None = None
+    walcl_trend_1m: str | None = None
+
+
 class GrowthInput(BaseModel):
     pmi_manufacturing: float | None = None
     pmi_services: float | None = None
@@ -51,6 +64,9 @@ class InflationInput(BaseModel):
 
 class ValuationInput(BaseModel):
     forward_pe: float | None = None
+    current_year_forward_pe: float | None = None
+    next_year_forward_pe: float | None = None
+    selected_year: int | None = None
     # forward | trailing | ttm_derived | unavailable — carried from the provider
     pe_basis: str = "unavailable"
     # raw provider note (e.g. "Mag 7 market-cap-weighted forward P/E — 7/7 constituents")
@@ -107,6 +123,7 @@ class IndicatorSnapshot(BaseModel):
     as_of: str | None = None
     data_freshness: DataFreshnessInput = Field(default_factory=DataFreshnessInput)
     liquidity: LiquidityInput = Field(default_factory=LiquidityInput)
+    plumbing: PlumbingInput = Field(default_factory=PlumbingInput)
     growth: GrowthInput = Field(default_factory=GrowthInput)
     inflation: InflationInput = Field(default_factory=InflationInput)
     valuation: ValuationInput = Field(default_factory=ValuationInput)

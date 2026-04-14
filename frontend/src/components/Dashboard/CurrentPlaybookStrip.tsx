@@ -29,6 +29,7 @@ const WHY_NOW_LABEL: Record<string, string> = {
   liquidity_quadrant_b_mixed_support: 'Liquidity: Quadrant B mixed support',
   liquidity_quadrant_c_transition: 'Liquidity: Quadrant C transition',
   liquidity_quadrant_d_tight: 'Liquidity: Quadrant D tight',
+  liquidity_ambiguous_wait_for_confirmation: 'Liquidity: wait for confirmation',
   valuation_buy_zone: 'Valuation: buy zone',
   valuation_stretched_pause_new_buying: 'Valuation: stretched, pause new buying',
   valuation_neutral_wait_for_edge: 'Valuation: neutral, wait for edge',
@@ -74,6 +75,9 @@ export function CurrentPlaybookStrip({ summary, state, playbookConclusion }: Pro
       <div style={s.topRow}>
         <div style={s.badges}>
           <StatusPill label={state.primary_regime} colorKey={rColor} />
+          {state.tactical_state && (
+            <StatusPill label={state.tactical_state} colorKey="muted" size="sm" />
+          )}
           <StatusPill label={`${state.confidence} Confidence`} colorKey={confidenceColor(state.confidence)} size="sm" />
           {state.secondary_overlays.slice(0, 3).map(o => (
             <StatusPill key={o} label={o} colorKey="muted" size="sm" />

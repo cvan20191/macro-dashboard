@@ -69,7 +69,8 @@ def test_proxy_red_zone_does_not_drive_hard_action() -> None:
             )
         )
     )
-    assert state.primary_regime != "Valuation Stretched"
+    assert state.primary_regime == "Quadrant B / Mixed Liquidity"
+    assert state.legacy_regime_label == "Mixed / Conflicted Regime"
     assert conclusion.new_cash_action != "pause_new_buying"
 
 
@@ -84,7 +85,9 @@ def test_true_forward_red_zone_can_pause_new_buying() -> None:
             )
         )
     )
-    assert state.primary_regime == "Valuation Stretched"
+    assert state.primary_regime == "Quadrant B / Mixed Liquidity"
+    assert state.tactical_state == "Hold / no new buying"
+    assert state.legacy_regime_label == "Valuation Stretched"
     assert conclusion.new_cash_action == "pause_new_buying"
 
 
@@ -106,5 +109,5 @@ def test_buy_zone_does_not_accumulate_when_liquidity_is_unknown() -> None:
 
     assert state.fed_chessboard is not None
     assert state.fed_chessboard.quadrant == "Unknown"
-    assert state.primary_regime != "Buy-the-Dip Window"
+    assert state.primary_regime == "Quadrant Unknown / Wait"
     assert conclusion.new_cash_action == "hold_and_wait"

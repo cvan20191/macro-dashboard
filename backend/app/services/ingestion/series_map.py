@@ -13,6 +13,9 @@ FRED_SERIES: dict[str, str] = {
     # Monetary policy
     "fed_funds_rate":     "DFEDTARU",        # Fed Funds target upper bound, daily
     "balance_sheet":      "WALCL",           # Total assets (Fed balance sheet), weekly
+    "total_reserves":     "TOTRESNS",        # Reserves of depository institutions, monthly
+    "repo_total":         "RPTTLD",          # Total repo operations, daily
+    "reverse_repo_total": "RRPTTLD",         # Total reverse repo operations, daily
     # Labour
     "unemployment_rate":  "UNRATE",          # Unemployment rate, monthly
     "initial_claims":     "ICSA",            # Initial jobless claims, weekly
@@ -52,6 +55,9 @@ YAHOO_TICKERS: dict[str, str] = {
 FRESHNESS_RULES: dict[str, int] = {
     "fed_funds_rate":     5,    # daily series, allow weekend gap
     "balance_sheet":      14,   # weekly (H.4.1 releases Thursdays, allow 2 weeks)
+    "total_reserves":     65,   # monthly
+    "repo_total":         10,   # daily
+    "reverse_repo_total": 10,   # daily
     "unemployment_rate":  65,   # monthly (BLS releases ~4 weeks after month-end)
     "initial_claims":     14,   # weekly (Thursday release)
     "nonfarm_payrolls":   65,   # monthly (BLS first Friday of following month)

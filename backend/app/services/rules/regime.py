@@ -1,7 +1,8 @@
 """
 Regime Classification — Module 7.
 
-Computes primary_regime, secondary_overlays, confidence, and current_posture
+Computes primary_regime, tactical_state, secondary_overlays, confidence,
+and current_posture from the outputs of all other rule modules.
 from the outputs of all other rule modules.
 
 All classification is deterministic. The LLM never touches this logic.
@@ -17,15 +18,20 @@ from app.services.rules.stagflation import StagflationResult
 from app.services.rules.stress import DollarResult, StressResult
 from app.services.rules.valuation import ValuationResult
 
-# Primary regime labels — kept in a single place for easy search
-R_MAX_LIQUIDITY = "Max Liquidity"
-R_LIQUIDITY_TRANSITION = "Liquidity Transition"
-R_STAGFLATION_TRAP = "Stagflation Trap"
-R_VALUATION_STRETCHED = "Valuation Stretched"
-R_BUY_THE_DIP = "Buy-the-Dip Window"
-R_CRASH_WATCH = "Crash Watch"
-R_DEFENSIVE = "Defensive / Illiquid Regime"
-R_MIXED = "Mixed / Conflicted Regime"
+# Primary regime labels — quadrant first
+R_QUADRANT_A = "Quadrant A / Max Liquidity"
+R_QUADRANT_B = "Quadrant B / Mixed Liquidity"
+R_QUADRANT_C = "Quadrant C / Liquidity Transition"
+R_QUADRANT_D = "Quadrant D / Illiquid Regime"
+R_QUADRANT_UNKNOWN = "Quadrant Unknown / Wait"
+
+# Tactical state labels
+T_AGGRESSIVE = "Aggressive risk-on"
+T_SELECTIVE = "Selective accumulation"
+T_START_SLOWLY = "Start buying very slowly"
+T_HOLD_NO_ADD = "Hold / no new buying"
+T_DEFENSIVE = "Defensive preservation"
+T_WAIT = "Wait for cleaner signal"
 
 # Overlay labels
 O_STICKY_INFLATION = "Sticky Inflation"
@@ -40,9 +46,73 @@ O_VAL_DANGEROUS = "Valuation Stretched"   # matches zone_label language; non-sen
 @dataclass
 class RegimeResult:
     primary_regime: str
+    tactical_state: str
+    legacy_regime_label: str
     secondary_overlays: list[str]
     confidence: str
     current_posture: str
+
+
+def _quadrant_regime_label(cb: ChessboardResult) -> str:
+    return {
+        "A": R_QUADRANT_A,
+        "B": R_QUADRANT_B,
+        "C": R_QUADRANT_C,
+        "D": R_QUADRANT_D,
+    }.get(cb.quadrant, R_QUADRANT_UNKNOWN)
+
+
+def _derive_tactical_state(
+    cb: ChessboardResult,
+    stag: StagflationResult,
+    val: ValuationResult,
+    stress: StressResult,
+) -> str:
+    if cb.quadrant == "Unknown":
+        return T_WAIT
+    if stress.stress_severe:
+        return T_DEFENSIVE
+    if cb.quadrant == "D":
+        return T_DEFENSIVE
+    if cb.quadrant == "A":
+        if val.can_pause_new_buying or stag.trap.active:
+            return T_HOLD_NO_ADD
+        return T_AGGRESSIVE
+    if cb.quadrant == "B":
+        if val.can_pause_new_buying or stag.trap.active:
+            return T_HOLD_NO_ADD
+        return T_SELECTIVE
+    if val.can_pause_new_buying:
+        return T_HOLD_NO_ADD
+    if val.can_support_buy_zone and cb.chessboard.transition_tag in {"Improving", "Stable"} and not stag.trap.active:
+        return T_START_SLOWLY
+    if stag.trap.active:
+        return T_HOLD_NO_ADD
+    return T_SELECTIVE
+
+
+def _legacy_label(
+    tactical_state: str,
+    cb: ChessboardResult,
+    stag: StagflationResult,
+    val: ValuationResult,
+    stress: StressResult,
+) -> str:
+    if stress.stress_severe:
+        return "Crash Watch"
+    if stag.trap.active:
+        return "Stagflation Trap"
+    if tactical_state == T_AGGRESSIVE:
+        return "Max Liquidity"
+    if tactical_state == T_START_SLOWLY:
+        return "Buy-the-Dip Window"
+    if tactical_state == T_HOLD_NO_ADD and val.can_pause_new_buying:
+        return "Valuation Stretched"
+    if tactical_state == T_DEFENSIVE:
+        return "Defensive / Illiquid Regime"
+    if cb.quadrant == "C":
+        return "Liquidity Transition"
+    return "Mixed / Conflicted Regime"
 
 
 def compute_regime(
@@ -53,35 +123,9 @@ def compute_regime(
     dollar: DollarResult,
     rally: RallyResult,
 ) -> RegimeResult:
-    # ── Primary regime — deterministic precedence ────────────────────────────
-
-    if stress.stress_severe and cb.liquidity_tight:
-        regime = R_CRASH_WATCH
-
-    elif stag.trap.active:
-        regime = R_STAGFLATION_TRAP
-
-    elif cb.quadrant == "D" and not val.can_support_buy_zone:
-        regime = R_DEFENSIVE
-
-    elif cb.quadrant == "A":
-        regime = R_MAX_LIQUIDITY
-
-    elif (
-        val.can_support_buy_zone
-        and cb.quadrant != "Unknown"
-        and (cb.liquidity_improving or not cb.liquidity_tight)
-    ):
-        regime = R_BUY_THE_DIP
-
-    elif val.can_pause_new_buying and cb.quadrant not in {"A"}:
-        regime = R_VALUATION_STRETCHED
-
-    elif cb.quadrant == "C" or (cb.liquidity_improving and not stag.trap.active):
-        regime = R_LIQUIDITY_TRANSITION
-
-    else:
-        regime = R_MIXED
+    primary_regime = _quadrant_regime_label(cb)
+    tactical_state = _derive_tactical_state(cb, stag, val, stress)
+    legacy_regime_label = _legacy_label(tactical_state, cb, stag, val, stress)
 
     # ── Secondary overlays ───────────────────────────────────────────────────
     overlays: list[str] = []
@@ -103,7 +147,15 @@ def compute_regime(
 
     # ── Confidence ───────────────────────────────────────────────────────────
     # Count how many signals align with the classified regime
-    aligning = _count_aligning_signals(regime, cb, stag, val, stress, rally)
+    aligning = 0
+    if cb.quadrant in {"A", "B", "C", "D"}:
+        aligning += 2
+    if stag.trap.active:
+        aligning += 1
+    if stress.stress_warning_active or stress.stress_severe:
+        aligning += 1
+    if val.can_support_buy_zone or val.can_pause_new_buying:
+        aligning += 1
     if aligning >= 4:
         confidence = "High"
     elif aligning >= 2:
@@ -111,108 +163,46 @@ def compute_regime(
     else:
         confidence = "Low"
 
-    # ── Posture ───────────────────────────────────────────────────────────────
-    posture = _derive_posture(regime, val, stag, stress, cb)
+    posture = _derive_posture(tactical_state)
 
     return RegimeResult(
-        primary_regime=regime,
+        primary_regime=primary_regime,
+        tactical_state=tactical_state,
+        legacy_regime_label=legacy_regime_label,
         secondary_overlays=overlays,
         confidence=confidence,
         current_posture=posture,
     )
 
 
-def _count_aligning_signals(
-    regime: str,
-    cb: ChessboardResult,
-    stag: StagflationResult,
-    val: ValuationResult,
-    stress: StressResult,
-    rally: RallyResult,
-) -> int:
-    count = 0
-    if regime == R_CRASH_WATCH:
-        if stress.stress_severe: count += 2
-        if cb.liquidity_tight: count += 1
-        if stag.growth_weakening: count += 1
-        if val.can_pause_new_buying: count += 1
-    elif regime == R_STAGFLATION_TRAP:
-        if stag.sticky_inflation: count += 2
-        if stag.growth_weakening: count += 2
-        if stag.trap.active: count += 2
-    elif regime == R_MAX_LIQUIDITY:
-        if cb.quadrant == "A": count += 3
-        if not val.can_pause_new_buying: count += 1
-        if rally.rally_fuel_score >= 60: count += 1
-    elif regime == R_BUY_THE_DIP:
-        if val.can_support_buy_zone: count += 3
-        if cb.liquidity_improving: count += 1
-        if not stress.stress_severe: count += 1
-    elif regime == R_VALUATION_STRETCHED:
-        if val.can_pause_new_buying: count += 3
-        if not cb.liquidity_improving: count += 1
-    elif regime == R_LIQUIDITY_TRANSITION:
-        if cb.quadrant == "C": count += 2
-        if cb.liquidity_improving: count += 1
-        if not stag.trap.active: count += 1
-    elif regime == R_DEFENSIVE:
-        if cb.quadrant == "D": count += 3
-        if not val.can_support_buy_zone: count += 1
-    else:  # mixed
-        count = 1
-    return count
-
-
 def _derive_posture(
-    regime: str,
-    val: ValuationResult,
-    stag: StagflationResult,
-    stress: StressResult,
-    cb: ChessboardResult,
+    tactical_state: str,
 ) -> str:
-    if regime == R_MAX_LIQUIDITY:
+    if tactical_state == T_AGGRESSIVE:
         return (
-            "Risk-on conditions are supportive; favor growth names and be willing "
-            "to hold higher-multiple positions with manageable debt."
+            "Liquidity is strongly supportive; aggressive growth exposure is acceptable, "
+            "but exit discipline matters if rates re-accelerate or support fades."
         )
-    if regime == R_LIQUIDITY_TRANSITION:
-        if val.can_pause_new_buying:
-            return (
-                "Hold existing winners, avoid aggressive new buying, and wait for "
-                "either valuation compression or cleaner liquidity confirmation."
-            )
+    if tactical_state == T_SELECTIVE:
         return (
-            "Liquidity is improving at the margin; accumulate selectively on "
-            "pullbacks, with preference for profitable names over pure speculation."
+            "Stay selective. Favor profitable or refinancing-resilient growth, "
+            "and avoid acting as if this is a full-liquidity regime."
         )
-    if regime == R_STAGFLATION_TRAP:
+    if tactical_state == T_START_SLOWLY:
         return (
-            "Defensive patience; favor profitable, lower-debt names over "
-            "high-multiple growth — the Fed cannot cleanly rescue either "
-            "growth or valuations here."
+            "Start buying very slowly. Conditions are improving, but this is still a "
+            "transition regime, not a full-liquidity chase."
         )
-    if regime == R_BUY_THE_DIP:
+    if tactical_state == T_HOLD_NO_ADD:
         return (
-            "Valuation has reset into the historical accumulation zone; "
-            "accumulate slowly on pullbacks, prioritising quality over speed."
+            "Hold existing quality positions, but do not add aggressively at current "
+            "valuation levels."
         )
-    if regime == R_VALUATION_STRETCHED:
+    if tactical_state == T_DEFENSIVE:
         return (
-            "Halt new accumulation at current levels; be patient and wait for "
-            "valuation to compress through earnings growth or a price reset."
+            "Preserve capital. Favor balance-sheet strength, lower leverage, and "
+            "defensive quality."
         )
-    if regime == R_CRASH_WATCH:
-        return (
-            "Preserve capital; reduce exposure to low-quality, high-debt names "
-            "and favor cash, short-duration assets, or defensive quality."
-        )
-    if regime == R_DEFENSIVE:
-        return (
-            "Capital is scarce and expensive; stay in low-debt, high-profitability "
-            "names and preserve dry powder for better entry conditions."
-        )
-    # Mixed / Conflicted
     return (
-        "Signals are mixed; stay patient, be selective, and avoid "
-        "aggressive positioning in either direction until the regime clarifies."
+        "Signals are unresolved. Wait for cleaner confirmation before taking fresh risk."
     )
