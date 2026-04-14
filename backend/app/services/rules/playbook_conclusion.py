@@ -30,6 +30,7 @@ _WHY_NOW_LIQUIDITY_BY_QUADRANT: dict[str, str] = {
     "B": "liquidity_quadrant_b_mixed_support",
     "C": "liquidity_quadrant_c_transition",
     "D": "liquidity_quadrant_d_tight",
+    "Unknown": "liquidity_ambiguous_wait_for_confirmation",
 }
 
 
@@ -124,6 +125,8 @@ def _derive_new_cash_action(
     # 6) max-liquidity quadrant (A) — doctrine: low cash / active deployment
     # 7) improving-liquidity selectivity
     # 8) default hold
+    if cb.quadrant == "Unknown":
+        return "hold_and_wait"
     if cb.quadrant == "A" and val.can_support_buy_zone and stag.trap.trap_state == "false":
         return "accumulate_selectively"
     if _defensive_override_needed(cb, val, stag, stress):
@@ -225,7 +228,7 @@ def _build_why_now(
     drivers.append(
         _WHY_NOW_LIQUIDITY_BY_QUADRANT.get(
             cb.quadrant,
-            "liquidity_quadrant_c_transition",
+            "liquidity_ambiguous_wait_for_confirmation",
         )
     )
 

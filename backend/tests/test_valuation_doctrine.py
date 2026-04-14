@@ -54,6 +54,7 @@ def test_proxy_red_zone_is_directional_only() -> None:
         )
     )
     assert result.is_stretched is True
+    assert result.valuation.zone_label == "Proxy stretched"
     assert result.can_pause_new_buying is False
 
 
@@ -85,3 +86,25 @@ def test_true_forward_red_zone_can_pause_new_buying() -> None:
     )
     assert state.primary_regime == "Valuation Stretched"
     assert conclusion.new_cash_action == "pause_new_buying"
+
+
+def test_buy_zone_does_not_accumulate_when_liquidity_is_unknown() -> None:
+    snapshot = _base_snapshot(
+        ValuationInput(
+            forward_pe=22.0,
+            pe_basis="forward",
+            signal_mode="actionable",
+            basis_confidence=0.95,
+        )
+    )
+    snapshot.liquidity.rate_trend_1m = "flat"
+    snapshot.liquidity.rate_trend_3m = "flat"
+    snapshot.liquidity.balance_sheet_trend_1m = "flat"
+    snapshot.liquidity.balance_sheet_trend_3m = "down"
+
+    state, conclusion = build_dashboard_state_with_conclusion(snapshot)
+
+    assert state.fed_chessboard is not None
+    assert state.fed_chessboard.quadrant == "Unknown"
+    assert state.primary_regime != "Buy-the-Dip Window"
+    assert conclusion.new_cash_action == "hold_and_wait"

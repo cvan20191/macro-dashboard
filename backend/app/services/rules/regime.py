@@ -67,7 +67,11 @@ def compute_regime(
     elif cb.quadrant == "A":
         regime = R_MAX_LIQUIDITY
 
-    elif val.can_support_buy_zone and (cb.liquidity_improving or not cb.liquidity_tight):
+    elif (
+        val.can_support_buy_zone
+        and cb.quadrant != "Unknown"
+        and (cb.liquidity_improving or not cb.liquidity_tight)
+    ):
         regime = R_BUY_THE_DIP
 
     elif val.can_pause_new_buying and cb.quadrant not in {"A"}:

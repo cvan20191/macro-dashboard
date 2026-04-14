@@ -35,6 +35,7 @@ MAG7_TICKERS: list[str] = ["AAPL", "MSFT", "NVDA", "AMZN", "GOOGL", "META", "TSL
 
 MIN_CONSTITUENTS = 5          # require at least 5 valid members
 MIN_COVERAGE_RATIO = 0.80     # require ≥80 % market-cap coverage of total Mag 7
+SPEAKER_NEXT_FY_SWITCH_DAYS = 100
 
 # ---------------------------------------------------------------------------
 # Internal helpers — field-name adapter
@@ -108,19 +109,6 @@ def _positive_finite(x: object) -> bool:
     return isinstance(x, (int, float)) and math.isfinite(float(x)) and float(x) > 0
 
 
-def calendarized_forward_eps(
-    fy1_eps: float | None,
-    fy2_eps: float | None,
-    days_to_fye: int | None,
-) -> float | None:
-    if fy1_eps is None:
-        return None
-    if fy2_eps is None or days_to_fye is None:
-        return fy1_eps
-    w = max(0.0, min(1.0, days_to_fye / 365.0))
-    return (fy1_eps * w) + (fy2_eps * (1.0 - w))
-
-
 # ---------------------------------------------------------------------------
 # FMP HTTP helpers
 # ---------------------------------------------------------------------------
@@ -153,23 +141,26 @@ def _fmp_get(path: str, params: dict, timeout: int) -> list | dict:
 # EPS estimate selector
 # ---------------------------------------------------------------------------
 
-def select_calendarized_forward_estimates(
+def select_speaker_forward_estimate(
     estimates: list[dict],
-) -> tuple[float | None, float | None, datetime | None]:
+    *,
+    now: datetime | None = None,
+    switch_days: int = SPEAKER_NEXT_FY_SWITCH_DAYS,
+) -> tuple[float | None, datetime | None, str | None, float | None, float | None]:
     """
-    Return FY1 EPS, FY2 EPS, and the FY1 fiscal year-end date.
+    Select speaker-faithful forward EPS from annual analyst estimates.
 
-    The dashboard uses a calendarized forward view so constituents share a more
-    consistent horizon than "nearest future annual row".
+    Use the current full-year expected EPS by default, but near fiscal year-end
+    switch to the next full-year estimate rather than blending FY1/FY2.
     """
-    now = datetime.now(timezone.utc)
+    ts = now or datetime.now(timezone.utc)
     candidates: list[tuple[datetime, float]] = []
 
     for row in estimates:
         row_date = _get_estimate_date(row)
         if row_date is None:
             continue
-        if row_date <= now:
+        if row_date <= ts:
             continue
         eps = _get_forward_eps(row)
         if eps is None:
@@ -177,12 +168,17 @@ def select_calendarized_forward_estimates(
         candidates.append((row_date, eps))
 
     if not candidates:
-        return None, None, None
+        return None, None, None, None, None
 
     candidates.sort(key=lambda t: t[0])
     fy1_date, fy1_eps = candidates[0]
-    fy2_eps = candidates[1][1] if len(candidates) > 1 else None
-    return fy1_eps, fy2_eps, fy1_date
+    fy2_date, fy2_eps = candidates[1] if len(candidates) > 1 else (None, None)
+    days_to_fy1 = (fy1_date.date() - ts.date()).days
+
+    if days_to_fy1 <= switch_days and fy2_eps is not None and fy2_date is not None:
+        return fy2_eps, fy2_date, "next_fy", fy1_eps, fy2_eps
+
+    return fy1_eps, fy1_date, "current_fy", fy1_eps, fy2_eps
 
 
 # ---------------------------------------------------------------------------
@@ -314,11 +310,11 @@ def compute_mag7_basket(
             })
             continue
 
-        fy1_eps, fy2_eps, fy1_date = select_calendarized_forward_estimates(estimates)
-        days_to_fye = (fy1_date.date() - datetime.now(timezone.utc).date()).days if fy1_date is not None else None
-        fwd_eps = calendarized_forward_eps(fy1_eps, fy2_eps, days_to_fye)
-        if fwd_eps is None:
-            logger.debug("FMP Mag7: skipping %s — no forward EPS estimate", ticker)
+        selected_eps, selected_date, horizon_label, fy1_eps, fy2_eps = select_speaker_forward_estimate(
+            estimates
+        )
+        if selected_eps is None:
+            logger.debug("FMP Mag7: skipping %s — no speaker-style forward EPS estimate", ticker)
             skipped.append(f"{ticker}(no_forward_eps)")
             constituents.append({
                 "ticker": ticker,
@@ -328,31 +324,35 @@ def compute_mag7_basket(
                 "fy1_eps": None if fy1_eps is None else round(fy1_eps, 4),
                 "fy2_eps": None if fy2_eps is None else round(fy2_eps, 4),
                 "shares": round(shares, 2) if shares is not None else None,
-                "fiscal_year_end": fy1_date.strftime("%Y-%m-%d") if fy1_date is not None else None,
+                "fiscal_year_end": None,
                 "estimate_as_of": today,
                 "basis_confidence": None,
             })
             continue
 
-        forward_earnings = fwd_eps * shares
+        forward_earnings = selected_eps * shares
         if not _positive_finite(forward_earnings):
             skipped.append(f"{ticker}(non_positive_earnings)")
             constituents.append({
                 "ticker": ticker,
                 "price": price,
-                "forward_eps": round(fwd_eps, 4),
+                "forward_eps": round(selected_eps, 4),
                 "forward_pe": None,
                 "fy1_eps": None if fy1_eps is None else round(fy1_eps, 4),
                 "fy2_eps": None if fy2_eps is None else round(fy2_eps, 4),
                 "shares": round(shares, 2),
-                "fiscal_year_end": fy1_date.strftime("%Y-%m-%d") if fy1_date is not None else None,
+                "fiscal_year_end": selected_date.strftime("%Y-%m-%d") if selected_date is not None else None,
                 "estimate_as_of": today,
                 "basis_confidence": 0.0,
             })
             continue
 
-        basis_confidence = 1.0 if fy2_eps is not None and days_to_fye is not None else 0.7
-        fwd_pe = round(price / fwd_eps, 2) if price is not None and _positive_finite(price / fwd_eps) else None
+        basis_confidence = 1.0 if horizon_label == "next_fy" else 0.95
+        fwd_pe = (
+            round(price / selected_eps, 2)
+            if price is not None and _positive_finite(price / selected_eps)
+            else None
+        )
         sum_market_cap_valid += mktcap
         sum_forward_earnings += forward_earnings
         weighted_basis_confidence += mktcap * basis_confidence
@@ -361,16 +361,22 @@ def compute_mag7_basket(
         constituents.append({
             "ticker": ticker,
             "price": price,
-            "forward_eps": round(fwd_eps, 4),
+            "forward_eps": round(selected_eps, 4),
             "forward_pe": fwd_pe,
             "fy1_eps": None if fy1_eps is None else round(fy1_eps, 4),
             "fy2_eps": None if fy2_eps is None else round(fy2_eps, 4),
             "shares": round(shares, 2),
-            "fiscal_year_end": fy1_date.strftime("%Y-%m-%d") if fy1_date is not None else None,
+            "fiscal_year_end": selected_date.strftime("%Y-%m-%d") if selected_date is not None else None,
             "estimate_as_of": today,
             "basis_confidence": round(basis_confidence, 2),
         })
-        logger.debug("FMP Mag7: %s — mktcap=%.2fB fwd_eps=%.2f pe=%.1f", ticker, mktcap / 1e9, fwd_eps, fwd_pe or 0)
+        logger.debug(
+            "FMP Mag7: %s — mktcap=%.2fB fwd_eps=%.2f pe=%.1f",
+            ticker,
+            mktcap / 1e9,
+            selected_eps,
+            fwd_pe or 0,
+        )
 
     # --- 3. Coverage check ---
     coverage_ratio = (
@@ -410,7 +416,7 @@ def compute_mag7_basket(
                 "signal_mode": "directional_only",
                 "basis_confidence": None,
                 "estimate_as_of": today,
-                "horizon_label": "calendarized_ntm",
+                "horizon_label": "speaker_fy_shift",
                 "horizon_coverage_ratio": 0.0,
                 "constituents": constituents,
             },
@@ -435,7 +441,8 @@ def compute_mag7_basket(
 
     note = (
         f"Mag 7 market-cap-weighted forward P/E — {valid_count}/{len(mag7)} constituents, "
-        f"{coverage_ratio:.0%} market-cap coverage (FMP analyst estimates, calendarized forward EPS)"
+        f"{coverage_ratio:.0%} market-cap coverage "
+        "(FMP analyst estimates, speaker-style annual horizon selection)"
     )
     if skipped:
         note += f". Excluded: {', '.join(skipped)}"
@@ -468,7 +475,7 @@ def compute_mag7_basket(
             "signal_mode": signal_mode,
             "basis_confidence": basis_confidence,
             "estimate_as_of": today,
-            "horizon_label": "calendarized_ntm",
+            "horizon_label": "speaker_fy_shift",
             "horizon_coverage_ratio": horizon_coverage_ratio,
             "constituents": constituents,
         },

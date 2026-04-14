@@ -38,6 +38,14 @@ _BASIS_LABELS: dict[str, str] = {
     "unavailable": "Unavailable",
 }
 
+_PROXY_ZONE_LABELS: dict[str, str] = {
+    "Green": "Proxy support only",
+    "Yellow": "Proxy neutral",
+    "Red": "Proxy stretched",
+    "BelowBuyZone": "Proxy below buy zone",
+    "Neutral": "Proxy transitional",
+}
+
 
 @dataclass
 class ValuationResult:
@@ -121,9 +129,8 @@ def compute_valuation(val_input: ValuationInput) -> ValuationResult:
         zone = "Neutral"
         label = "Transitional"
 
-    # Append proxy marker to label when basis is not true forward P/E
     if is_fallback:
-        label = f"{label} (Proxy)"
+        label = _PROXY_ZONE_LABELS.get(zone, "Proxy signal only")
 
     valuation = Valuation(
         forward_pe=pe,

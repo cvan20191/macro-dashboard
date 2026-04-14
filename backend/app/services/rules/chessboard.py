@@ -135,7 +135,7 @@ def compute_chessboard(liq: LiquidityInput) -> ChessboardResult:
     impulse = _rate_impulse(liq)
     bs_dir = _bs_direction(liq)
 
-    # ── Primary Quadrant (directional doctrine map) ──────────────────────────
+    # ── Primary Quadrant (strict directional doctrine map) ───────────────────
     if impulse == "easing" and bs_dir == "expanding":
         quadrant = "A"
         label = "MAX LIQUIDITY"
@@ -148,46 +148,34 @@ def compute_chessboard(liq: LiquidityInput) -> ChessboardResult:
     elif impulse == "tightening" and bs_dir == "contracting":
         quadrant = "D"
         label = "MAX ILLIQUIDITY"
-    # Stable/flat rate impulse is directional ambiguity. Keep smallest-safe
-    # fallback behavior by using policy stance only as a tie-breaker.
-    elif bs_dir == "expanding":
-        if stance == "easy":
-            quadrant = "A"
-            label = "MAX LIQUIDITY"
-        else:
-            quadrant = "B"
-            label = "MIXED LIQUIDITY: BALANCE SHEET SUPPORT"
-    elif bs_dir == "contracting":
-        if stance == "restrictive":
-            quadrant = "D"
-            label = "MAX ILLIQUIDITY"
-        else:
-            quadrant = "C"
-            label = "TRANSITION TO EASIER MONEY"
     else:
-        quadrant = "C"
-        label = "TRANSITION TO EASIER MONEY"
+        quadrant = "Unknown"
+        label = "AMBIGUOUS / WAIT FOR CLEANER SIGNAL"
 
     # ── Transition Tag ────────────────────────────────────────────────────────
-    # Mixed-signal-aware: conflicting signals → Stable rather than forced direction
-    supportive = impulse == "easing" or (
-        bs_dir == "expanding" and quadrant in ("B", "C")
-    )
-    adverse = impulse == "tightening" or (
-        bs_dir == "contracting" and quadrant in ("C", "D")
-    )
-
-    if supportive and not adverse:
-        transition_tag = "Improving"
-    elif adverse and not supportive:
-        transition_tag = "Deteriorating"
-    else:
+    if quadrant == "Unknown":
         transition_tag = "Stable"
+    else:
+        supportive = impulse == "easing" or (
+            bs_dir == "expanding" and quadrant in ("B", "C")
+        )
+        adverse = impulse == "tightening" or (
+            bs_dir == "contracting" and quadrant in ("C", "D")
+        )
+
+        if supportive and not adverse:
+            transition_tag = "Improving"
+        elif adverse and not supportive:
+            transition_tag = "Deteriorating"
+        else:
+            transition_tag = "Stable"
 
     # ── Downstream compatibility booleans ────────────────────────────────────
     # Derived from quadrant + transition_tag rather than raw trend strings,
     # keeping downstream logic aligned with the new two-layer model.
-    liquidity_improving = quadrant == "A" or transition_tag == "Improving"
+    liquidity_improving = quadrant == "A" or (
+        quadrant in {"B", "C"} and transition_tag == "Improving"
+    )
     liquidity_tight = quadrant == "D" or (
         quadrant == "C" and transition_tag == "Deteriorating"
     )
