@@ -356,7 +356,6 @@ def build_indicator_snapshot(
     rate_series = get_series("fed_funds_rate")
     bs_series = get_series("balance_sheet")
 
-    # Infer policy put from rate trend if not explicitly provided
     rate_t1m = _rate_trend(rate_series, 21)
     rate_t3m = _rate_trend(rate_series, 63)
     bs_t1m = _trend_by_absolute_delta(bs_series, 28, _BALANCE_SHEET_DELTA_THRESHOLD)
@@ -365,9 +364,6 @@ def build_indicator_snapshot(
     rate_impulse_short = _rate_impulse_short(rate_series, rate_direction_medium_term)
     balance_sheet_direction_medium_term = _balance_sheet_direction_medium_term(bs_series)
     balance_sheet_pace = _balance_sheet_pace(bs_series, balance_sheet_direction_medium_term)
-    if not fed_put and rate_t1m == "down":
-        fed_put = True
-        logger.info("Fed put inferred from falling rate trend")
 
     liquidity = LiquidityInput(
         fed_funds_rate=get_val("fed_funds_rate"),
@@ -534,9 +530,9 @@ def build_indicator_snapshot(
     # Policy support
     # ------------------------------------------------------------------
     policy = PolicySupportInput(
-        fed_put=fed_put,
-        treasury_put=treasury_put,
-        political_put=political_put,
+        fed_put=bool(fed_put),
+        treasury_put=bool(treasury_put),
+        political_put=bool(political_put),
     )
 
     # ------------------------------------------------------------------

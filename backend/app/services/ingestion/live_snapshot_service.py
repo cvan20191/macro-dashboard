@@ -42,7 +42,7 @@ from app.services.summary_engine import generate_summary
 logger = logging.getLogger(__name__)
 
 # Bump when snapshot shape / provider mix changes so TTL cache + disk recovery are not stale.
-_LIVE_SNAPSHOT_CACHE_VERSION = 9  # bumped: weekly reserve-balance plumbing input
+_LIVE_SNAPSHOT_CACHE_VERSION = 10  # bumped: live policy-support no longer uses deterministic defaults
 # Same-day in-memory cache for successful FMP Mag 7 valuation results only.
 _FMP_VALUATION_DAY_CACHE: dict[str, FetchResult] = {}
 
@@ -468,9 +468,10 @@ async def get_live_snapshot(
         freshness_statuses=statuses,
         stale_series=stale_series,
         overall_status=overall_status,
-        fed_put=settings.default_fed_put,
-        treasury_put=settings.default_treasury_put,
-        political_put=settings.default_political_put,
+        # Three puts are tactical overlays, not deterministic live doctrine state.
+        fed_put=False,
+        treasury_put=False,
+        political_put=False,
     )
 
     source_meta = _build_source_meta(raw, statuses)

@@ -22,7 +22,8 @@ class Settings(BaseSettings):
     fmp_api_key: str = ""                     # Financial Modeling Prep — for Mag 7 Forward P/E basket
     valuation_provider: str = "fmp"           # "fmp" (primary) | "yahoo" (fallback / override)
 
-    # Policy support heuristic defaults (used when live political signals aren't API-sourced)
+    # Policy support compatibility defaults.
+    # Live doctrine state no longer consumes these; they remain for fixtures/legacy callers only.
     default_fed_put: bool = False
     default_treasury_put: bool = False
     default_political_put: bool = False

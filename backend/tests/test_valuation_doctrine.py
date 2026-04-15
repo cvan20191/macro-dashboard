@@ -124,7 +124,7 @@ def test_directional_only_forward_pe_does_not_enable_hard_buy_signal() -> None:
             pe_source_note="speaker forward basket incomplete on selected year",
             signal_mode="directional_only",
             basis_confidence=0.5,
-            horizon_label="speaker_calendar_current_year",
+            horizon_label="speaker_fye_proximity_current_year",
             coverage_count=6,
             coverage_ratio=0.84,
             horizon_coverage_ratio=0.72,

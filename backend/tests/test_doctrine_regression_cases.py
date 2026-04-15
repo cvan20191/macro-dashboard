@@ -162,9 +162,9 @@ def make_snapshot(
             basis_confidence=basis_confidence,
             estimate_as_of=as_of[:10],
             horizon_label=(
-                "speaker_calendar_current_year"
+                "speaker_fye_proximity_current_year"
                 if selected_year == int(as_of[:4])
-                else "speaker_calendar_next_year"
+                else "speaker_fye_proximity_next_year"
             ),
             horizon_coverage_ratio=coverage_ratio,
             constituents=[],
