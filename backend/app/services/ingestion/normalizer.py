@@ -45,10 +45,10 @@ _BALANCE_SHEET_DELTA_THRESHOLD = 25_000.0  # WALCL is in millions USD => 25B thr
 _UNEMPLOYMENT_DELTA_THRESHOLD = 0.05
 _CLAIMS_PCT_THRESHOLD = 0.03
 _PAYROLLS_DELTA_THRESHOLD = 25.0
-_RATE_MEDIUM_TERM_LOOKBACK_DAYS = 91
-_RATE_SHORT_LOOKBACK_DAYS = 28
-_BALANCE_SHEET_MEDIUM_TERM_LOOKBACK_DAYS = 91
-_BALANCE_SHEET_SHORT_LOOKBACK_DAYS = 28
+_RATE_MOVE_RECENCY_DAYS = 120
+_BALANCE_SHEET_REGIME_LOOKBACK_DAYS = 182
+_BALANCE_SHEET_PACE_LOOKBACK_DAYS = 56
+_BALANCE_SHEET_PREV_PACE_LOOKBACK_DAYS = 112
 _PLUMBING_RESERVE_TREND_LOOKBACK_DAYS = 28
 _PLUMBING_RESERVE_BUFFER_LOOKBACK_DAYS = 182
 _PLUMBING_FLOW_TREND_LOOKBACK_DAYS = 28
@@ -62,11 +62,15 @@ def _parse_series_date(raw: str) -> date | None:
         return None
 
 
+def _sorted_points(series: list[tuple[str, float]]) -> list[tuple[date, float]]:
+    points = [(_parse_series_date(d), v) for d, v in series]
+    return [(d, v) for d, v in points if d is not None]
+
+
 def _anchor_value(series: list[tuple[str, float]], lookback_days: int) -> tuple[float, float] | None:
     if len(series) < 2:
         return None
-    parsed = [(_parse_series_date(d), v) for d, v in series]
-    parsed = [(d, v) for d, v in parsed if d is not None]
+    parsed = _sorted_points(series)
     if len(parsed) < 2:
         return None
     end_date, end_val = parsed[-1]
@@ -132,50 +136,56 @@ def _rate_trend(series: list[tuple[str, float]], lookback_days: int) -> str:
     return _trend_by_absolute_delta(series, lookback_days, _RATE_BPS_THRESHOLD)
 
 
-def _rate_direction_medium_term(series: list[tuple[str, float]]) -> str:
-    trend = _trend_by_absolute_delta(
-        series,
-        _RATE_MEDIUM_TERM_LOOKBACK_DAYS,
-        _RATE_BPS_THRESHOLD,
-    )
-    if trend == "down":
-        return "easing"
-    if trend == "up":
-        return "tightening"
-    if trend == "flat":
+def _latest_distinct_rate_move(series: list[tuple[str, float]]) -> tuple[str, date | None]:
+    """
+    Infer the actual medium-term policy path from the latest distinct target move.
+
+    Returns the direction of the current policy plateau and the date that plateau
+    began. That lets short impulse decay back to "stable" after a long flat
+    post-cut or post-hike period.
+    """
+    points = _sorted_points(series)
+    if len(points) < 2:
+        return "unknown", None
+
+    latest_value = points[-1][1]
+    for idx in range(len(points) - 2, -1, -1):
+        prev_date, prev_value = points[idx]
+        if abs(latest_value - prev_value) >= _RATE_BPS_THRESHOLD:
+            move_date = points[idx + 1][0]
+            if latest_value > prev_value:
+                return "tightening", move_date
+            return "easing", move_date
+
+    return "stable", points[-1][0]
+
+
+def _rate_impulse_from_move_date(
+    *,
+    medium_term_direction: str,
+    move_date: date | None,
+    series: list[tuple[str, float]],
+) -> str:
+    points = _sorted_points(series)
+    if not points or move_date is None:
+        return "unknown" if medium_term_direction == "unknown" else "stable"
+
+    latest_date = points[-1][0]
+    recency_days = (latest_date - move_date).days
+
+    if medium_term_direction == "easing":
+        return "confirming_easing" if recency_days <= _RATE_MOVE_RECENCY_DAYS else "stable"
+    if medium_term_direction == "tightening":
+        return "confirming_tightening" if recency_days <= _RATE_MOVE_RECENCY_DAYS else "stable"
+    if medium_term_direction == "stable":
         return "stable"
-    return "unknown"
-
-
-def _rate_impulse_short(series: list[tuple[str, float]], medium_term: str) -> str:
-    short = _trend_by_absolute_delta(
-        series,
-        _RATE_SHORT_LOOKBACK_DAYS,
-        _RATE_BPS_THRESHOLD,
-    )
-    if short == "unknown":
-        return "unknown"
-    if medium_term == "easing":
-        if short == "down":
-            return "confirming_easing"
-        if short == "flat":
-            return "stable"
-        return "mixed"
-    if medium_term == "tightening":
-        if short == "up":
-            return "confirming_tightening"
-        if short == "flat":
-            return "stable"
-        return "mixed"
-    if medium_term == "stable":
-        return "stable" if short == "flat" else "mixed"
     return "unknown"
 
 
 def _balance_sheet_direction_medium_term(series: list[tuple[str, float]]) -> str:
     trend = _trend_by_absolute_delta(
         series,
-        _BALANCE_SHEET_MEDIUM_TERM_LOOKBACK_DAYS,
+        _BALANCE_SHEET_REGIME_LOOKBACK_DAYS,
         _BALANCE_SHEET_DELTA_THRESHOLD,
     )
     if trend == "up":
@@ -185,24 +195,45 @@ def _balance_sheet_direction_medium_term(series: list[tuple[str, float]]) -> str
     return "flat_or_mixed"
 
 
+def _value_at_or_before(points: list[tuple[date, float]], target_date: date) -> float | None:
+    anchor: float | None = None
+    for point_date, point_value in points:
+        if point_date <= target_date:
+            anchor = point_value
+        else:
+            break
+    return anchor
+
+
 def _balance_sheet_pace(series: list[tuple[str, float]], medium_term: str) -> str:
-    short = _trend_by_absolute_delta(
-        series,
-        _BALANCE_SHEET_SHORT_LOOKBACK_DAYS,
-        _BALANCE_SHEET_DELTA_THRESHOLD,
+    points = _sorted_points(series)
+    if len(points) < 3:
+        return "flat_or_mixed"
+
+    latest_date, latest_value = points[-1]
+    recent_start = _value_at_or_before(
+        points,
+        latest_date - timedelta(days=_BALANCE_SHEET_PACE_LOOKBACK_DAYS),
     )
+    prior_start = _value_at_or_before(
+        points,
+        latest_date - timedelta(days=_BALANCE_SHEET_PREV_PACE_LOOKBACK_DAYS),
+    )
+
+    if recent_start is None or prior_start is None:
+        return "flat_or_mixed"
+
+    recent_delta = latest_value - recent_start
+    prior_delta = recent_start - prior_start
+
     if medium_term == "contracting":
-        if short in {"flat", "up"}:
+        if recent_delta >= prior_delta:
             return "contracting_slower"
-        if short == "down":
-            return "contracting_same_or_faster"
-        return "flat_or_mixed"
+        return "contracting_same_or_faster"
     if medium_term == "expanding":
-        if short in {"flat", "down"}:
+        if recent_delta <= prior_delta:
             return "expanding_slower"
-        if short == "up":
-            return "expanding_same_or_faster"
-        return "flat_or_mixed"
+        return "expanding_same_or_faster"
     return "flat_or_mixed"
 
 
@@ -412,8 +443,12 @@ def build_indicator_snapshot(
     rate_t3m = _rate_trend(rate_series, 63)
     bs_t1m = _trend_by_absolute_delta(bs_series, 28, _BALANCE_SHEET_DELTA_THRESHOLD)
     bs_t3m = _trend_by_absolute_delta(bs_series, 91, _BALANCE_SHEET_DELTA_THRESHOLD)
-    rate_direction_medium_term = _rate_direction_medium_term(rate_series)
-    rate_impulse_short = _rate_impulse_short(rate_series, rate_direction_medium_term)
+    rate_direction_medium_term, rate_move_date = _latest_distinct_rate_move(rate_series)
+    rate_impulse_short = _rate_impulse_from_move_date(
+        medium_term_direction=rate_direction_medium_term,
+        move_date=rate_move_date,
+        series=rate_series,
+    )
     balance_sheet_direction_medium_term = _balance_sheet_direction_medium_term(bs_series)
     balance_sheet_pace = _balance_sheet_pace(bs_series, balance_sheet_direction_medium_term)
 
@@ -432,9 +467,8 @@ def build_indicator_snapshot(
         balance_sheet_direction_medium_term=balance_sheet_direction_medium_term,
         balance_sheet_pace=balance_sheet_pace,
         quadrant_basis_note=(
-            "Quadrant uses medium-term Fed rate direction plus medium-term Fed "
-            "balance-sheet direction; short impulse and balance-sheet pace only "
-            "modify transition."
+            "Quadrant uses the actual medium-term policy-rate path and actual medium-term "
+            "Fed balance-sheet path; transition is handled separately."
         ),
     )
     plumbing = PlumbingInput(

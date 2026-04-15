@@ -189,6 +189,22 @@ def _derive_confidences(snapshot: IndicatorSnapshot, r: _RuleOutputs) -> tuple[s
 
 
 def _derive_regime_transition(r: _RuleOutputs) -> RegimeTransition:
+    transition_path = r.cb.chessboard.liquidity_transition_path
+    if transition_path and transition_path != "none" and "_to_" in transition_path:
+        from_regime, to_regime = transition_path.split("_to_", 1)
+        reasons = [
+            f"transition_path:{transition_path}",
+            f"rate_impulse:{r.cb.chessboard.rate_impulse or 'unknown'}",
+            f"balance_sheet_pace:{r.cb.chessboard.balance_sheet_pace or 'unknown'}",
+        ]
+        return RegimeTransition(
+            from_regime=from_regime,
+            to_regime=to_regime,
+            transition_strength="moderate",
+            direction="improving",
+            reasons=reasons,
+        )
+
     direction = {
         "Improving": "improving",
         "Deteriorating": "deteriorating",

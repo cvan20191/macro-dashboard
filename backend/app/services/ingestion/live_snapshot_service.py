@@ -79,7 +79,7 @@ _FRED_FETCH_MAP: dict[str, tuple[str, str, int, int]] = {
     # fed_funds_rate uses 1100d (~36 months) so the normalizer can compute
     # a cycle position for the chessboard's policy stance inference.
     "fed_funds_rate":    (FRED_SERIES["fed_funds_rate"],   "Fed Funds Upper Bound",        5,   1100),
-    "balance_sheet":     (FRED_SERIES["balance_sheet"],    "Fed Balance Sheet",            10,  120),
+    "balance_sheet":     (FRED_SERIES["balance_sheet"],    "Fed Balance Sheet",            10,  365),
     "total_reserves":    (FRED_SERIES["total_reserves"],   "Reserve Balances",             10,  210),
     "repo_total":        (FRED_SERIES["repo_total"],       "Total Repo Operations",        5,   240),
     "reverse_repo_total": (FRED_SERIES["reverse_repo_total"], "Total Reverse Repo Operations", 5, 240),

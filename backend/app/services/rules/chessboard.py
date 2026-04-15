@@ -7,60 +7,6 @@ from dataclasses import dataclass
 from app.schemas.dashboard_state import FedChessboard
 from app.schemas.indicator_snapshot import LiquidityInput
 
-# ── Heuristic implementation helpers ─────────────────────────────────────────
-# These constants are heuristic defaults — implementation helpers, not
-# transcript-exact speaker doctrine. Do not surface these in the UI as if they
-# were universal economic laws.
-
-# Zero-bound shortcut: rate at or near ZLB is unambiguously "easy"
-_POLICY_ZERO_BOUND: float = 0.50
-
-# Cycle-aware bands applied to 0–1 normalized cycle position
-# (bottom 30% of trailing cycle range → easy; top 30% → restrictive)
-_CYCLE_EASY_MAX: float = 0.30
-_CYCLE_RESTRICTIVE_MIN: float = 0.70
-
-# Fallback fixed bands used only when cycle history is unavailable.
-# Labelled explicitly as fallback heuristics; the cycle-aware path is preferred.
-_POLICY_EASY_FALLBACK: float = 1.0
-_POLICY_RESTRICTIVE_FALLBACK: float = 3.5
-
-
-# ── Helper functions ──────────────────────────────────────────────────────────
-
-def _policy_stance(rate: float | None, cycle_pos: float | None) -> str:
-    """
-    Classify policy stance as 'easy' | 'middle' | 'restrictive'.
-
-    Inference order (most to least preferred):
-    1. Zero-bound shortcut — rate at or near ZLB is unambiguously easy.
-    2. Cycle-aware inference — rate position within trailing 36-month range.
-    3. Fallback fixed bands — used only when cycle history is unavailable.
-
-    Rate impulse does NOT remap the middle band. Trend is reserved for the
-    transition tag only.
-    """
-    # 1. Zero-bound shortcut
-    if rate is not None and rate <= _POLICY_ZERO_BOUND:
-        return "easy"
-
-    # 2. Cycle-aware inference (preferred over fixed cutoffs when available)
-    if cycle_pos is not None:
-        if cycle_pos <= _CYCLE_EASY_MAX:
-            return "easy"
-        if cycle_pos >= _CYCLE_RESTRICTIVE_MIN:
-            return "restrictive"
-        return "middle"
-
-    # 3. Fallback fixed bands (cycle history unavailable)
-    if rate is None:
-        return "middle"
-    if rate <= _POLICY_EASY_FALLBACK:
-        return "easy"
-    if rate >= _POLICY_RESTRICTIVE_FALLBACK:
-        return "restrictive"
-    return "middle"
-
 def _legacy_rate_direction_medium_term(liq: LiquidityInput) -> str:
     t3 = (liq.rate_trend_3m or "").lower()
     if t3 == "down":
@@ -126,7 +72,6 @@ class ChessboardResult:
 
 
 def compute_chessboard(liq: LiquidityInput) -> ChessboardResult:
-    stance = _policy_stance(liq.fed_funds_rate, liq.rate_cycle_position)
     rate_direction = liq.rate_direction_medium_term or _legacy_rate_direction_medium_term(liq)
     rate_impulse_short = liq.rate_impulse_short or _legacy_rate_impulse_short(liq, rate_direction)
     balance_sheet_direction = (
@@ -151,31 +96,32 @@ def compute_chessboard(liq: LiquidityInput) -> ChessboardResult:
         quadrant = "Unknown"
         label = "AMBIGUOUS / WAIT FOR CLEANER SIGNAL"
 
-    if quadrant == "A":
+    liquidity_transition_path = "none"
+    transition_basis_note: str | None = None
+
+    if quadrant == "D" and balance_sheet_pace == "contracting_slower" and rate_impulse_short in {"stable", "mixed"}:
+        liquidity_transition_path = "D_to_C"
+        transition_tag = "Improving"
+        transition_basis_note = (
+            "Actual quadrant remains D, but the path is transitioning toward C because QT is "
+            "still ongoing but slowing and the rate path is no longer actively tightening."
+        )
+    elif quadrant == "A":
         transition_tag = "Improving"
     elif quadrant == "B":
         transition_tag = "Stable"
     elif quadrant == "C":
         if balance_sheet_pace == "contracting_slower" or rate_impulse_short == "confirming_easing":
             transition_tag = "Improving"
-        elif rate_impulse_short == "mixed":
-            transition_tag = "Stable"
         else:
             transition_tag = "Stable"
     elif quadrant == "D":
-        if balance_sheet_pace == "contracting_slower" and rate_impulse_short in {"stable", "mixed"}:
-            transition_tag = "Stable"
-        else:
-            transition_tag = "Deteriorating"
+        transition_tag = "Deteriorating"
     else:
         transition_tag = "Stable"
 
-    liquidity_improving = quadrant == "A" or (
-        quadrant == "C" and transition_tag == "Improving"
-    )
-    liquidity_tight = quadrant == "D" or (
-        quadrant == "C" and transition_tag == "Deteriorating"
-    )
+    liquidity_improving = quadrant in {"A", "C"} or liquidity_transition_path == "D_to_C"
+    liquidity_tight = quadrant == "D" and liquidity_transition_path != "D_to_C"
 
     # ── Direction field (preserved for existing consumers) ───────────────────
     direction = _derive_direction(liq)
@@ -188,20 +134,21 @@ def compute_chessboard(liq: LiquidityInput) -> ChessboardResult:
         balance_sheet_trend_1m=liq.balance_sheet_trend_1m,
         balance_sheet_trend_3m=liq.balance_sheet_trend_3m,
         direction_vs_1m_ago=direction,
-        policy_stance=stance,
+        policy_stance=None,
         rate_impulse=rate_impulse_short,
         balance_sheet_direction=balance_sheet_direction,
         balance_sheet_pace=balance_sheet_pace,
-        transition_tag=transition_tag,
         rate_direction_medium_term=rate_direction,
         rate_impulse_short=rate_impulse_short,
         balance_sheet_direction_medium_term=balance_sheet_direction,
+        liquidity_transition_path=liquidity_transition_path,
+        transition_tag=transition_tag,
         quadrant_basis_note=(
             liq.quadrant_basis_note
-            or "Quadrant uses medium-term Fed rate direction plus medium-term Fed "
-            "balance-sheet direction; short impulse and balance-sheet pace only "
-            "modify transition."
+            or "Quadrant uses the actual medium-term policy-rate path and actual medium-term "
+            "Fed balance-sheet path; transition is handled separately."
         ),
+        transition_basis_note=transition_basis_note,
     )
 
     return ChessboardResult(

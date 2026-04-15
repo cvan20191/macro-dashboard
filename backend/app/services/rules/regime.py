@@ -68,11 +68,20 @@ def _derive_tactical_state(
     val: ValuationResult,
     stress: StressResult,
 ) -> str:
+    transition_path = cb.chessboard.liquidity_transition_path
+
     if cb.quadrant == "Unknown":
         return T_WAIT
     if stress.stress_severe:
         return T_DEFENSIVE
     if cb.quadrant == "D":
+        if (
+            transition_path == "D_to_C"
+            and val.can_support_buy_zone
+            and not stag.trap.active
+            and not stress.stress_severe
+        ):
+            return T_START_SLOWLY
         return T_DEFENSIVE
     if cb.quadrant == "A":
         if val.can_pause_new_buying or stag.trap.active:

@@ -20,16 +20,19 @@ class FedChessboard(BaseModel):
     balance_sheet_trend_3m: str | None = None
     direction_vs_1m_ago: str | None = None
     # Existing surfaced helpers.
+    # Debug-only compatibility field; live doctrine output should leave this unset.
     policy_stance: str | None = None
     rate_impulse: str | None = None
     balance_sheet_direction: str | None = None
     balance_sheet_pace: str | None = None
-    transition_tag: str | None = None
     # Doctrine-facing explanation fields.
     rate_direction_medium_term: str | None = None
     rate_impulse_short: str | None = None
     balance_sheet_direction_medium_term: str | None = None
+    liquidity_transition_path: str | None = None
+    transition_tag: str | None = None
     quadrant_basis_note: str | None = None
+    transition_basis_note: str | None = None
 
 
 class LiquidityPlumbing(BaseModel):

@@ -116,11 +116,11 @@ def _derive_new_cash_action(
     stag: StagflationResult,
     stress: StressResult,
 ) -> NewCashAction:
+    transition_path = cb.chessboard.liquidity_transition_path
+
     if cb.quadrant == "Unknown":
         return "hold_and_wait"
     if _defensive_override_needed(cb, val, stag, stress):
-        return "defensive_preservation"
-    if cb.quadrant == "D":
         return "defensive_preservation"
     if val.can_pause_new_buying:
         return "pause_new_buying"
@@ -134,6 +134,16 @@ def _derive_new_cash_action(
         and not stress.stress_severe
     ):
         return "accumulate_selectively"
+    if (
+        cb.quadrant == "D"
+        and transition_path == "D_to_C"
+        and val.can_support_buy_zone
+        and not stag.trap.active
+        and not stress.stress_severe
+    ):
+        return "accumulate_selectively"
+    if cb.quadrant == "D":
+        return "hold_and_wait"
     if cb.quadrant == "B":
         return "hold_and_wait"
     return "hold_and_wait"

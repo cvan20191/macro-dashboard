@@ -192,12 +192,12 @@ def make_snapshot(
     )
 
 
-def test_april_2025_d_to_c_transition_starts_buying_slowly() -> None:
+def test_early_april_2025_is_actual_d_but_transitioning_to_c_with_slow_buying() -> None:
     snapshot = make_snapshot(
         as_of="2025-04-10T00:00:00Z",
         fed_funds_rate=4.50,
-        rate_direction_medium_term="easing",
-        rate_impulse_short="confirming_easing",
+        rate_direction_medium_term="tightening",
+        rate_impulse_short="stable",
         balance_sheet_direction_medium_term="contracting",
         balance_sheet_pace="contracting_slower",
         forward_pe=23.0,
@@ -210,14 +210,45 @@ def test_april_2025_d_to_c_transition_starts_buying_slowly() -> None:
         basis_confidence=1.0,
         core_cpi_yoy=2.8,
         unemployment_rate=4.1,
-        fed_put=True,
+        fed_put=False,
+    )
+
+    state, conclusion = build_dashboard_state_with_conclusion(snapshot)
+
+    assert state.primary_regime.startswith("Quadrant D")
+    assert state.fed_chessboard is not None
+    assert state.fed_chessboard.liquidity_transition_path == "D_to_C"
+    assert state.tactical_state == "Start buying very slowly"
+    assert conclusion.new_cash_action == "accumulate_selectively"
+
+
+def test_after_actual_rate_path_turns_down_regime_becomes_c() -> None:
+    snapshot = make_snapshot(
+        as_of="2025-09-01T00:00:00Z",
+        fed_funds_rate=4.25,
+        rate_direction_medium_term="easing",
+        rate_impulse_short="confirming_easing",
+        balance_sheet_direction_medium_term="contracting",
+        balance_sheet_pace="contracting_slower",
+        forward_pe=29.5,
+        current_year_forward_pe=29.5,
+        next_year_forward_pe=27.8,
+        selected_year=2025,
+        signal_mode="actionable",
+        coverage_count=7,
+        coverage_ratio=1.0,
+        basis_confidence=1.0,
+        core_cpi_yoy=3.0,
+        unemployment_rate=4.3,
+        fed_put=False,
     )
 
     state, conclusion = build_dashboard_state_with_conclusion(snapshot)
 
     assert state.primary_regime.startswith("Quadrant C")
-    assert state.tactical_state == "Start buying very slowly"
-    assert conclusion.new_cash_action == "accumulate_selectively"
+    assert state.fed_chessboard is not None
+    assert state.fed_chessboard.liquidity_transition_path == "none"
+    assert conclusion is not None
 
 
 def test_late_september_2025_high_valuation_pauses_new_buying_but_keeps_c() -> None:

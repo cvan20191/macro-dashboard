@@ -40,16 +40,18 @@ export interface FedChessboard {
   balance_sheet_trend_1m?: string
   balance_sheet_trend_3m?: string
   direction_vs_1m_ago?: string
-  policy_stance?: string
+  policy_stance?: string | null
   rate_impulse?: string
   balance_sheet_direction?: string
   balance_sheet_pace?: string
+  liquidity_transition_path?: string
   transition_tag?: string
   // Doctrine-facing explanation.
   rate_direction_medium_term?: string
   rate_impulse_short?: string
   balance_sheet_direction_medium_term?: string
   quadrant_basis_note?: string | null
+  transition_basis_note?: string | null
 }
 
 export interface LiquidityPlumbing {
