@@ -10,17 +10,19 @@ def _payload(
     shares: float = 10.0,
     current_eps: float | None = 5.0,
     next_eps: float | None = 6.0,
+    current_fye: str = "2026-12-31",
+    next_fye: str = "2027-12-31",
 ) -> dict:
     annual_eps_by_year: dict[int, float] = {}
     estimate_dates_by_year: dict[int, str] = {}
 
     if current_eps is not None:
         annual_eps_by_year[2026] = current_eps
-        estimate_dates_by_year[2026] = "2026-12-31"
+        estimate_dates_by_year[2026] = current_fye
 
     if next_eps is not None:
         annual_eps_by_year[2027] = next_eps
-        estimate_dates_by_year[2027] = "2027-12-31"
+        estimate_dates_by_year[2027] = next_fye
 
     return {
         "ticker": ticker,
@@ -66,8 +68,9 @@ def test_selects_next_year_when_weighted_days_to_fye_are_near_year_end() -> None
 
     assert result.valid is True
     assert result.selected_year == 2027
-    assert result.horizon_label == "speaker_fye_proximity_next_year"
+    assert result.horizon_label == "speaker_fye_transition_band"
     assert result.speaker_forward_pe == result.next_year_forward_pe
+    assert result.signal_mode == "directional_only"
 
 
 def test_selected_year_incomplete_is_directional_only() -> None:
@@ -81,7 +84,7 @@ def test_selected_year_incomplete_is_directional_only() -> None:
         _payload("GGG", next_eps=None),
     ]
 
-    result = compute_speaker_forward_pe(payloads, as_of=date(2026, 10, 15))
+    result = compute_speaker_forward_pe(payloads, as_of=date(2026, 11, 15))
 
     assert result.valid is True
     assert result.selected_year == 2027
@@ -100,10 +103,48 @@ def test_market_cap_weighted_completeness_can_still_be_actionable() -> None:
         _payload("GGG", shares=0.1, next_eps=None),
     ]
 
-    result = compute_speaker_forward_pe(payloads, as_of=date(2026, 10, 15))
+    result = compute_speaker_forward_pe(payloads, as_of=date(2026, 11, 15))
 
     assert result.valid is True
     assert result.selected_year == 2027
     assert result.coverage_count == 6
     assert result.coverage_ratio > 0.99
+    assert result.signal_mode == "actionable"
+
+
+def test_transition_band_is_directional_only_even_when_coverage_is_complete() -> None:
+    payloads = [
+        _payload("AAA", current_fye="2026-12-31"),
+        _payload("BBB", current_fye="2026-12-31"),
+        _payload("CCC", current_fye="2026-12-31"),
+        _payload("DDD", current_fye="2026-12-31"),
+        _payload("EEE", current_fye="2026-12-31"),
+        _payload("FFF", current_fye="2026-12-31"),
+        _payload("GGG", current_fye="2026-12-31"),
+    ]
+
+    result = compute_speaker_forward_pe(payloads, as_of=date(2026, 8, 15))
+
+    assert result.valid is True
+    assert result.selected_year == 2027
+    assert result.horizon_label == "speaker_fye_transition_band"
+    assert result.signal_mode == "directional_only"
+
+
+def test_deep_year_end_next_year_can_be_actionable() -> None:
+    payloads = [
+        _payload("AAA"),
+        _payload("BBB"),
+        _payload("CCC"),
+        _payload("DDD"),
+        _payload("EEE"),
+        _payload("FFF"),
+        _payload("GGG"),
+    ]
+
+    result = compute_speaker_forward_pe(payloads, as_of=date(2026, 11, 15))
+
+    assert result.valid is True
+    assert result.selected_year == 2027
+    assert result.horizon_label == "speaker_fye_proximity_next_year"
     assert result.signal_mode == "actionable"

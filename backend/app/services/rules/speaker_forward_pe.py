@@ -8,6 +8,8 @@ from typing import Any
 from app.doctrine import SignalMode
 
 _NEAR_YEAR_END_DAYS = 120
+_FYE_TRANSITION_BAND_START_DAYS = 150
+_FYE_TRANSITION_BAND_END_DAYS = 60
 _MIN_ACTIONABLE_COVERAGE_RATIO = 0.90
 _MIN_ACTIONABLE_CONSTITUENTS = 5
 
@@ -187,26 +189,36 @@ def compute_speaker_forward_pe(
         current_year=current_year,
         as_of=as_of,
     )
+    horizon_transition = False
 
     if current_pe is None and next_pe is not None:
         selected_year = next_year
+        horizon_label = "speaker_fye_proximity_next_year"
     elif next_pe is None:
         selected_year = current_year
-    elif weighted_days_to_fye is not None and weighted_days_to_fye <= _NEAR_YEAR_END_DAYS:
+        horizon_label = "speaker_fye_proximity_current_year"
+    elif weighted_days_to_fye is None:
+        selected_year = current_year
+        horizon_label = "speaker_fye_proximity_current_year"
+    elif weighted_days_to_fye <= _FYE_TRANSITION_BAND_END_DAYS:
         selected_year = next_year
+        horizon_label = "speaker_fye_proximity_next_year"
+    elif weighted_days_to_fye <= _FYE_TRANSITION_BAND_START_DAYS:
+        selected_year = next_year
+        horizon_label = "speaker_fye_transition_band"
+        horizon_transition = True
     else:
         selected_year = current_year
+        horizon_label = "speaker_fye_proximity_current_year"
 
     if selected_year == next_year and next_pe is not None:
         speaker_pe = next_pe
         selected_included = next_included
         selected_mc = next_mc
-        horizon_label = "speaker_fye_proximity_next_year"
     else:
         speaker_pe = current_pe
         selected_included = current_included
         selected_mc = current_mc
-        horizon_label = "speaker_fye_proximity_current_year"
 
     coverage_count = len(selected_included)
     coverage_ratio = round(selected_mc / total_market_cap, 4) if total_market_cap > 0 else 0.0
@@ -214,6 +226,7 @@ def compute_speaker_forward_pe(
 
     selected_year_actionable = (
         speaker_pe is not None
+        and not horizon_transition
         and usable_constituent_count >= _MIN_ACTIONABLE_CONSTITUENTS
         and coverage_count >= _MIN_ACTIONABLE_CONSTITUENTS
         and coverage_ratio >= _MIN_ACTIONABLE_COVERAGE_RATIO
@@ -225,6 +238,11 @@ def compute_speaker_forward_pe(
 
     if not valid:
         note = "Mag 7 speaker forward P/E unavailable — no usable selected-year forward-earnings basket."
+    elif horizon_transition:
+        note = (
+            "Mag 7 speaker forward P/E is inside the year-end transition band; "
+            "publish as directional_only and surface both current-year and next-year values."
+        )
     elif signal_mode == "directional_only":
         note = (
             "Mag 7 speaker forward P/E available, but selected-year basket completeness is not strong enough "

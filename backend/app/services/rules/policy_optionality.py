@@ -5,10 +5,12 @@ from dataclasses import dataclass
 from app.schemas.dashboard_state import PolicyOptionality
 from app.schemas.indicator_snapshot import GrowthInput, InflationInput
 
-# Internal implementation helpers only. These are not surfaced as doctrine laws.
-_LABOR_SLACK_PRESENT_UR = 4.8
+# Transcript-anchored implementation helpers.
+# These are still implementation thresholds, but they are tied to specific
+# speaker guidance rather than generic smooth heuristics.
+_LABOR_SLACK_PRESENT_UR = 5.0
 _LABOR_SLACK_ABSENT_UR = 4.3
-_INFLATION_COOLING_CORE_CPI = 2.6
+_INFLATION_COOLING_CORE_CPI = 2.5
 _INFLATION_STICKY_CORE_CPI = 3.0
 
 
@@ -30,6 +32,8 @@ def _labor_slack_state(growth: GrowthInput) -> str:
         return "unknown"
     if ur >= _LABOR_SLACK_PRESENT_UR:
         return "present"
+    # Labor slack can already be emerging even before the level fully reaches
+    # the 5% area when unemployment and claims are both worsening.
     if ut == "up" and ict == "up":
         return "present"
     if ur <= _LABOR_SLACK_ABSENT_UR and ut != "up" and ict != "up":
@@ -47,15 +51,15 @@ def _inflation_state(inflation: InflationInput) -> str:
         return "unknown"
     if (
         core <= _INFLATION_COOLING_CORE_CPI
-        and shelter != "sticky"
-        and services != "sticky"
+        and shelter not in {"sticky", "hot"}
+        and services not in {"sticky", "hot"}
         and not oil_risk
     ):
         return "cooling"
     if (
         core >= _INFLATION_STICKY_CORE_CPI
-        or shelter == "sticky"
-        or services == "sticky"
+        or shelter in {"sticky", "hot"}
+        or services in {"sticky", "hot"}
         or oil_risk
     ):
         return "sticky_or_hot"
@@ -72,15 +76,18 @@ def compute_policy_optionality(
     if labor_slack_state == "absent" and inflation_state == "sticky_or_hot":
         constraint_level = "trapped"
         note = (
-            "Weak data is not automatically bullish because inflation is still sticky/hot "
-            "and labor slack is not clearly present."
+            "Inflation is still sticky/hot while labor slack is not clearly present. "
+            "Bad data is not automatically bullish because the Fed is constrained."
         )
     elif labor_slack_state == "present" and inflation_state == "cooling":
         constraint_level = "free"
-        note = "The Fed has room to ease because labor slack is present and inflation is cooling."
+        note = (
+            "Labor slack is present and inflation is cooling toward target. "
+            "The Fed has room to ease."
+        )
     elif labor_slack_state == "unknown" or inflation_state == "unknown":
         constraint_level = "unknown"
-        note = "Policy optionality cannot be determined cleanly from the current inputs."
+        note = "Policy optionality cannot be determined cleanly from current inputs."
     else:
         constraint_level = "limited"
         note = (
