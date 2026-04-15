@@ -28,7 +28,12 @@ from app.services.ingestion.series_map import (
 )
 from app.services.providers.base import FetchResult, ProviderError
 from app.services.providers.cpi_provider import fetch_cpi_components
-from app.services.providers.fmp_client import fetch_constituent_payloads
+from app.services.providers.fmp_client import (
+    fetch_constituent_payloads,
+    fetch_income_statement_growth,
+    fetch_key_metrics_ttm,
+    fetch_stock_peers,
+)
 from app.services.providers.fred_client import fetch_series
 from app.services.providers.pmi_provider import fetch_pmi_manufacturing, fetch_pmi_services
 from app.services.providers.yahoo_client import fetch_pe_ratio_proxy, fetch_ticker
@@ -41,6 +46,7 @@ from app.services.rules.cohort_forward_pe import (
 )
 from app.services.rules.dashboard_state_builder import build_dashboard_state_with_conclusion
 from app.services.rules.deterministic_summary import build_deterministic_summary
+from app.services.rules.peer_scorecard import PeerRaw, build_peer_scorecard
 
 logger = logging.getLogger(__name__)
 
@@ -339,6 +345,84 @@ def _fetch_cpi_all(api_key: str, timeout: int) -> dict[str, FetchResult]:
     return fetch_cpi_components(api_key=api_key, timeout=timeout)
 
 
+def _build_peer_raw_map(
+    *,
+    api_key: str,
+    timeout: int,
+) -> dict[str, PeerRaw]:
+    registry = load_equity_cohort_registry()
+    seeds: list[str] = []
+    seen_seeds: set[str] = set()
+    for config in registry.values():
+        for raw_ticker in config.get("tickers", []):
+            ticker = str(raw_ticker).upper()
+            if ticker not in seen_seeds:
+                seen_seeds.add(ticker)
+                seeds.append(ticker)
+
+    expanded: list[str] = []
+    seen_expanded: set[str] = set()
+    for seed in seeds:
+        if seed not in seen_expanded:
+            seen_expanded.add(seed)
+            expanded.append(seed)
+        for peer in fetch_stock_peers(seed, api_key=api_key, timeout=timeout):
+            peer_ticker = str(peer).upper()
+            if peer_ticker not in seen_expanded:
+                seen_expanded.add(peer_ticker)
+                expanded.append(peer_ticker)
+
+    payloads = fetch_constituent_payloads(expanded, api_key=api_key, timeout=timeout)
+    payload_map = {
+        str(row.get("ticker")).upper(): row
+        for row in payloads
+        if row.get("ticker")
+    }
+
+    raw_map: dict[str, PeerRaw] = {}
+    for ticker in expanded:
+        row = payload_map.get(ticker, {})
+        growth = fetch_income_statement_growth(ticker, api_key=api_key, timeout=timeout)
+        metrics = fetch_key_metrics_ttm(ticker, api_key=api_key, timeout=timeout)
+
+        revenue_growth_yoy = None
+        for key in ("growthRevenue", "revenueGrowth", "revenueGrowthTTM"):
+            value = growth.get(key)
+            if isinstance(value, (int, float)):
+                revenue_growth_yoy = float(value)
+                break
+
+        earnings_growth_yoy = None
+        for key in ("growthNetIncome", "netIncomeGrowth", "epsGrowth"):
+            value = growth.get(key)
+            if isinstance(value, (int, float)):
+                earnings_growth_yoy = float(value)
+                break
+
+        debt_to_ebitda = None
+        for key in ("netDebtToEBITDA", "netDebtToEbitda", "debtToEBITDA"):
+            value = metrics.get(key)
+            if isinstance(value, (int, float)):
+                debt_to_ebitda = float(value)
+                break
+
+        raw_map[ticker] = PeerRaw(
+            ticker=ticker,
+            sector=row.get("sector"),
+            industry=row.get("industry"),
+            annual_eps_by_year=row.get("annual_eps_by_year") or {},
+            annual_revenue_by_year=row.get("annual_revenue_by_year") or {},
+            estimate_dates_by_year=row.get("estimate_dates_by_year") or {},
+            price=row.get("price"),
+            shares=row.get("shares"),
+            revenue_growth_yoy=revenue_growth_yoy,
+            earnings_growth_yoy=earnings_growth_yoy,
+            debt_to_ebitda=debt_to_ebitda,
+        )
+
+    return raw_map
+
+
 def _manual_pmi_result(series_id: str, series_name: str, value: float) -> FetchResult:
     return FetchResult(
         value=value,
@@ -562,6 +646,36 @@ async def get_live_playbook(
     state, playbook_conclusion = build_dashboard_state_with_conclusion(snapshot)
     deterministic_summary = build_deterministic_summary(state, playbook_conclusion)
     state = state.model_copy(update={"deterministic_summary": deterministic_summary})
+
+    if settings.fmp_api_key:
+        try:
+            raw_map = await asyncio.to_thread(
+                partial(
+                    _build_peer_raw_map,
+                    api_key=settings.fmp_api_key,
+                    timeout=settings.http_timeout_seconds,
+                )
+            )
+            registry = load_equity_cohort_registry()
+            scorecards = []
+            for config in registry.values():
+                for raw_ticker in config.get("tickers", []):
+                    ticker = str(raw_ticker).upper()
+                    target = raw_map.get(ticker)
+                    if target is None:
+                        continue
+                    peers = [peer for peer_ticker, peer in raw_map.items() if peer_ticker != ticker]
+                    scorecards.append(
+                        build_peer_scorecard(
+                            target=target,
+                            peers=peers,
+                            as_of=date.today(),
+                        )
+                    )
+            state = state.model_copy(update={"peer_scorecards": scorecards})
+        except Exception as exc:
+            logger.warning("Peer scorecard build failed (non-fatal): %s", exc)
+
     try:
         macro = await asyncio.to_thread(
             get_macro_expectations_state,

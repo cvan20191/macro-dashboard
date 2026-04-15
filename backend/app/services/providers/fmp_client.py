@@ -158,6 +158,15 @@ def fetch_profiles_batch(tickers: list[str], api_key: str, timeout: int) -> dict
     return result
 
 
+def fetch_company_profile(symbol: str, *, api_key: str, timeout: int = 20) -> dict:
+    """
+    Fetch a single company profile.
+    Returns the first profile row or {} when unavailable.
+    """
+    profiles = fetch_profiles_batch([symbol], api_key, timeout)
+    return profiles.get(symbol.upper(), {})
+
+
 def fetch_analyst_estimates(ticker: str, api_key: str, timeout: int) -> list[dict]:
     """
     Fetch annual analyst EPS estimates for a single ticker.
@@ -189,6 +198,34 @@ def _annual_eps_by_year(estimates: list[dict]) -> dict[int, float]:
         if row_date is None or eps is None:
             continue
         out[row_date.year] = eps
+    return out
+
+
+def _annual_revenue_by_year(estimates: list[dict]) -> dict[int, float]:
+    out: dict[int, float] = {}
+    for row in estimates:
+        row_date = _get_estimate_date(row)
+        if row_date is None:
+            continue
+
+        revenue = None
+        for key in (
+            "revenueAvg",
+            "estimatedRevenueAvg",
+            "estimatedRevenueMean",
+            "revenueMean",
+            "revenueEstimated",
+            "estimatedRevenue",
+            "consensusRevenue",
+        ):
+            value = row.get(key)
+            if _positive_finite(value):
+                revenue = float(value)
+                break
+
+        if revenue is None:
+            continue
+        out[row_date.year] = revenue
     return out
 
 
@@ -236,8 +273,11 @@ def fetch_constituent_payloads(
                 "shares": shares,
                 "market_cap": market_cap,
                 "annual_eps_by_year": _annual_eps_by_year(estimates),
+                "annual_revenue_by_year": _annual_revenue_by_year(estimates),
                 "estimate_dates_by_year": _annual_dates_by_year(estimates),
                 "estimate_as_of": today,
+                "sector": profile.get("sector"),
+                "industry": profile.get("industry"),
             }
         )
 
@@ -254,3 +294,30 @@ def fetch_mag7_constituent_payloads(
         api_key=api_key,
         timeout=timeout,
     )
+
+
+def fetch_stock_peers(symbol: str, *, api_key: str, timeout: int = 20) -> list[str]:
+    data = _fmp_get("stock-peers", {"symbol": symbol, "apikey": api_key}, timeout)
+    if not isinstance(data, list):
+        return []
+
+    peers: list[str] = []
+    for row in data:
+        peer_symbol = row.get("symbol") if isinstance(row, dict) else None
+        if isinstance(peer_symbol, str) and peer_symbol and peer_symbol.upper() != symbol.upper():
+            peers.append(peer_symbol.upper())
+    return peers
+
+
+def fetch_income_statement_growth(symbol: str, *, api_key: str, timeout: int = 20) -> dict:
+    data = _fmp_get("income-statement-growth", {"symbol": symbol, "apikey": api_key}, timeout)
+    if isinstance(data, list) and data and isinstance(data[0], dict):
+        return data[0]
+    return {}
+
+
+def fetch_key_metrics_ttm(symbol: str, *, api_key: str, timeout: int = 20) -> dict:
+    data = _fmp_get("key-metrics-ttm", {"symbol": symbol, "apikey": api_key}, timeout)
+    if isinstance(data, list) and data and isinstance(data[0], dict):
+        return data[0]
+    return {}

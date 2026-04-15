@@ -241,6 +241,27 @@ class DeterministicSummary(BaseModel):
     caution_line: str | None = None
 
 
+class PeerScoreMetric(BaseModel):
+    value: float | None = None
+    peer_median: float | None = None
+    favorable_percentile: float | None = None
+    signal: str = "unknown"  # better_than_peers | in_line | worse_than_peers | unknown
+
+
+class PeerScorecard(BaseModel):
+    ticker: str
+    sector: str | None = None
+    industry: str | None = None
+    peer_tickers: list[str] = Field(default_factory=list)
+    revenue_growth: PeerScoreMetric = Field(default_factory=PeerScoreMetric)
+    earnings_growth: PeerScoreMetric = Field(default_factory=PeerScoreMetric)
+    forward_pe: PeerScoreMetric = Field(default_factory=PeerScoreMetric)
+    debt_to_ebitda: PeerScoreMetric = Field(default_factory=PeerScoreMetric)
+    verdict: str = "insufficient"  # leader | balanced | fragile | insufficient
+    same_sector_peer_compare_required: bool = True
+    note: str | None = None
+
+
 class ReasonedText(BaseModel):
     code: str
     text: str
@@ -280,6 +301,7 @@ class DashboardState(BaseModel):
     exit_discipline_signal: ExitDisciplineSignal | None = None
     cohort_rotation_guidance: CohortRotationGuidance | None = None
     deterministic_summary: DeterministicSummary | None = None
+    peer_scorecards: list[PeerScorecard] = Field(default_factory=list)
     top_watchpoints: list[str] = Field(default_factory=list)
     top_watchpoint_details: list[ReasonedText] = Field(default_factory=list)
     what_changed: list[str] = Field(default_factory=list)

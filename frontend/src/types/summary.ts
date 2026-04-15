@@ -257,6 +257,27 @@ export interface DeterministicSummary {
   caution_line?: string | null
 }
 
+export interface PeerScoreMetric {
+  value?: number
+  peer_median?: number
+  favorable_percentile?: number
+  signal?: string
+}
+
+export interface PeerScorecard {
+  ticker?: string
+  sector?: string | null
+  industry?: string | null
+  peer_tickers?: string[]
+  revenue_growth?: PeerScoreMetric
+  earnings_growth?: PeerScoreMetric
+  forward_pe?: PeerScoreMetric
+  debt_to_ebitda?: PeerScoreMetric
+  verdict?: string
+  same_sector_peer_compare_required?: boolean
+  note?: string | null
+}
+
 export interface DashboardState {
   as_of?: string
   data_freshness: DataFreshness
@@ -289,6 +310,7 @@ export interface DashboardState {
   exit_discipline_signal?: ExitDisciplineSignal
   cohort_rotation_guidance?: CohortRotationGuidance
   deterministic_summary?: DeterministicSummary
+  peer_scorecards?: PeerScorecard[]
   top_watchpoints: string[]
   top_watchpoint_details?: Array<{ code: string; text: string }>
   what_changed: string[]
