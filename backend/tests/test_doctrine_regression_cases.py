@@ -236,6 +236,9 @@ def test_early_april_2025_is_actual_d_but_transitioning_to_c_with_slow_buying() 
     assert state.policy_optionality.constraint_level in {"limited", "free"}
     assert state.fed_chessboard.liquidity_transition_path == "D_to_C"
     assert state.tactical_state == "Start buying very slowly"
+    assert state.exposure_guidance is not None
+    assert state.exposure_guidance.max_cash_deployment_pct == 20
+    assert state.exposure_guidance.leverage_allowed is False
     assert conclusion.new_cash_action == "accumulate_selectively"
 
 

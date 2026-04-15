@@ -188,6 +188,13 @@ export interface RallyConditions {
   market_ignoring_bad_news: boolean
 }
 
+export interface ExposureGuidance {
+  deployment_style?: string
+  max_cash_deployment_pct?: number
+  leverage_allowed?: boolean
+  note?: string | null
+}
+
 export interface DashboardState {
   as_of?: string
   data_freshness: DataFreshness
@@ -215,6 +222,7 @@ export interface DashboardState {
   systemic_stress?: SystemicStress
   dollar_context?: DollarContext
   rally_conditions?: RallyConditions
+  exposure_guidance?: ExposureGuidance
   top_watchpoints: string[]
   top_watchpoint_details?: Array<{ code: string; text: string }>
   what_changed: string[]

@@ -172,6 +172,13 @@ class RallyConditions(BaseModel):
     market_ignoring_bad_news: bool = False
 
 
+class ExposureGuidance(BaseModel):
+    deployment_style: str = "wait"  # aggressive | selective | defensive | wait
+    max_cash_deployment_pct: int = 0
+    leverage_allowed: bool = False
+    note: str | None = None
+
+
 class ReasonedText(BaseModel):
     code: str
     text: str
@@ -206,6 +213,7 @@ class DashboardState(BaseModel):
     systemic_stress: SystemicStress | None = None
     dollar_context: DollarContext | None = None
     rally_conditions: RallyConditions | None = None
+    exposure_guidance: ExposureGuidance | None = None
     top_watchpoints: list[str] = Field(default_factory=list)
     top_watchpoint_details: list[ReasonedText] = Field(default_factory=list)
     what_changed: list[str] = Field(default_factory=list)

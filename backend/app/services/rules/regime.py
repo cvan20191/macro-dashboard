@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from app.schemas.dashboard_state import ExposureGuidance
 from app.services.rules.chessboard import ChessboardResult
 from app.services.rules.policy_optionality import PolicyOptionalityResult
 from app.services.rules.rally import RallyResult
@@ -55,6 +56,7 @@ class RegimeResult:
     secondary_overlays: list[str]
     confidence: str
     current_posture: str
+    exposure_guidance: ExposureGuidance
 
 
 def _quadrant_regime_label(cb: ChessboardResult) -> str:
@@ -136,6 +138,47 @@ def _legacy_label(
     return "Mixed / Conflicted Regime"
 
 
+def _derive_exposure_guidance(cb: ChessboardResult) -> ExposureGuidance:
+    """
+    Transcript-faithful cash deployment guidance is tied to the actual quadrant,
+    not to valuation, transition, or tactical language.
+    """
+    if cb.quadrant == "A":
+        return ExposureGuidance(
+            deployment_style="aggressive",
+            max_cash_deployment_pct=100,
+            leverage_allowed=True,
+            note="Most liquid environment. Full cash deployment is acceptable and leverage is permissible.",
+        )
+    if cb.quadrant == "B":
+        return ExposureGuidance(
+            deployment_style="selective",
+            max_cash_deployment_pct=50,
+            leverage_allowed=False,
+            note="Mixed liquidity. Stay selective and do not deploy more than about half of cash.",
+        )
+    if cb.quadrant == "C":
+        return ExposureGuidance(
+            deployment_style="selective",
+            max_cash_deployment_pct=50,
+            leverage_allowed=False,
+            note="Transition liquidity. Stay selective and do not deploy more than about half of cash.",
+        )
+    if cb.quadrant == "D":
+        return ExposureGuidance(
+            deployment_style="defensive",
+            max_cash_deployment_pct=20,
+            leverage_allowed=False,
+            note="Least liquid environment. Keep deployment small, around 20% maximum, or sit on the sideline.",
+        )
+    return ExposureGuidance(
+        deployment_style="wait",
+        max_cash_deployment_pct=0,
+        leverage_allowed=False,
+        note="Signals are unresolved. Wait for cleaner confirmation before deploying new cash.",
+    )
+
+
 def compute_regime(
     cb: ChessboardResult,
     stag: StagflationResult,
@@ -148,6 +191,7 @@ def compute_regime(
     primary_regime = _quadrant_regime_label(cb)
     tactical_state = _derive_tactical_state(cb, stag, val, stress, policy_optionality)
     legacy_regime_label = _legacy_label(tactical_state, cb, stag, val, stress)
+    exposure_guidance = _derive_exposure_guidance(cb)
 
     # ── Secondary overlays ───────────────────────────────────────────────────
     overlays: list[str] = []
@@ -202,6 +246,7 @@ def compute_regime(
         secondary_overlays=overlays,
         confidence=confidence,
         current_posture=posture,
+        exposure_guidance=exposure_guidance,
     )
 
 
