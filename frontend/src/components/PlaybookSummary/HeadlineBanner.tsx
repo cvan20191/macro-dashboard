@@ -1,7 +1,8 @@
-import type { PlaybookSummary } from '../../types/summary'
+import type { DashboardState, PlaybookSummary } from '../../types/summary'
 
 interface Props {
-  summary: PlaybookSummary
+  summary?: PlaybookSummary | null
+  state?: DashboardState
 }
 
 const REGIME_COLORS: Record<string, { bg: string; border: string; text: string }> = {
@@ -26,8 +27,15 @@ const DEFAULT_REGIME_COLOR = {
   text: 'var(--blue)',
 }
 
-export function HeadlineBanner({ summary }: Props) {
-  const regimeColor = REGIME_COLORS[summary.regime_label] ?? DEFAULT_REGIME_COLOR
+export function HeadlineBanner({ state, summary }: Props) {
+  const det = state?.deterministic_summary
+  const regimeLabel = state?.primary_regime ?? summary?.regime_label ?? 'Quadrant Unknown / Wait'
+  const postureLabel = state?.current_posture ?? summary?.posture_label ?? 'Wait for cleaner signal'
+  const regimeColor = REGIME_COLORS[regimeLabel] ?? DEFAULT_REGIME_COLOR
+  const headline = det?.headline ?? summary?.headline_summary ?? 'Macro Playbook'
+  const expanded = det?.subheadline ?? summary?.expanded_summary ?? null
+  const actionLine = det?.action_line ?? null
+  const cautionLine = det?.caution_line ?? null
 
   return (
     <div style={styles.container}>
@@ -41,18 +49,20 @@ export function HeadlineBanner({ summary }: Props) {
             color: regimeColor.text,
           }}
         >
-          {summary.regime_label}
+          {regimeLabel}
         </span>
         <span style={{ ...styles.badge, ...styles.postureBadge }}>
-          {summary.posture_label}
+          {postureLabel}
         </span>
       </div>
 
       {/* Headline */}
-      <p style={styles.headline}>{summary.headline_summary}</p>
+      <p style={styles.headline}>{headline}</p>
 
       {/* Expanded */}
-      <p style={styles.expanded}>{summary.expanded_summary}</p>
+      {expanded ? <p style={styles.expanded}>{expanded}</p> : null}
+      {actionLine ? <p style={styles.inlineLine}>{actionLine}</p> : null}
+      {cautionLine ? <p style={styles.caution}>{cautionLine}</p> : null}
     </div>
   )
 }
@@ -101,5 +111,15 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '14px',
     lineHeight: 1.75,
     color: 'var(--text-secondary)',
+  },
+  inlineLine: {
+    fontSize: '13px',
+    lineHeight: 1.65,
+    color: 'var(--text-primary)',
+  },
+  caution: {
+    fontSize: '13px',
+    lineHeight: 1.65,
+    color: 'var(--yellow)',
   },
 }

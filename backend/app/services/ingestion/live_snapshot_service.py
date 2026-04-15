@@ -40,6 +40,7 @@ from app.services.rules.cohort_forward_pe import (
     load_equity_cohort_registry,
 )
 from app.services.rules.dashboard_state_builder import build_dashboard_state_with_conclusion
+from app.services.rules.deterministic_summary import build_deterministic_summary
 from app.services.summary_engine import generate_summary
 
 logger = logging.getLogger(__name__)
@@ -560,6 +561,8 @@ async def get_live_playbook(
     snapshot = snapshot_resp.snapshot
 
     state, playbook_conclusion = build_dashboard_state_with_conclusion(snapshot)
+    deterministic_summary = build_deterministic_summary(state, playbook_conclusion)
+    state = state.model_copy(update={"deterministic_summary": deterministic_summary})
     try:
         macro = await asyncio.to_thread(
             get_macro_expectations_state,

@@ -248,6 +248,15 @@ export interface CohortRotationGuidance {
   note?: string | null
 }
 
+export interface DeterministicSummary {
+  headline?: string
+  subheadline?: string | null
+  action_line?: string | null
+  deployment_line?: string | null
+  cohort_line?: string | null
+  caution_line?: string | null
+}
+
 export interface DashboardState {
   as_of?: string
   data_freshness: DataFreshness
@@ -279,6 +288,7 @@ export interface DashboardState {
   equity_profile_guidance?: EquityProfileGuidance
   exit_discipline_signal?: ExitDisciplineSignal
   cohort_rotation_guidance?: CohortRotationGuidance
+  deterministic_summary?: DeterministicSummary
   top_watchpoints: string[]
   top_watchpoint_details?: Array<{ code: string; text: string }>
   what_changed: string[]

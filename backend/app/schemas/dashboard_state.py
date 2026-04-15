@@ -232,6 +232,15 @@ class CohortRotationGuidance(BaseModel):
     note: str | None = None
 
 
+class DeterministicSummary(BaseModel):
+    headline: str
+    subheadline: str | None = None
+    action_line: str | None = None
+    deployment_line: str | None = None
+    cohort_line: str | None = None
+    caution_line: str | None = None
+
+
 class ReasonedText(BaseModel):
     code: str
     text: str
@@ -270,6 +279,7 @@ class DashboardState(BaseModel):
     equity_profile_guidance: EquityProfileGuidance | None = None
     exit_discipline_signal: ExitDisciplineSignal | None = None
     cohort_rotation_guidance: CohortRotationGuidance | None = None
+    deterministic_summary: DeterministicSummary | None = None
     top_watchpoints: list[str] = Field(default_factory=list)
     top_watchpoint_details: list[ReasonedText] = Field(default_factory=list)
     what_changed: list[str] = Field(default_factory=list)

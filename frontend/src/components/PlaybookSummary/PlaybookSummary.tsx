@@ -1,4 +1,4 @@
-import type { PlaybookSummary as PlaybookSummaryType } from '../../types/summary'
+import type { DashboardState, PlaybookSummary as PlaybookSummaryType } from '../../types/summary'
 import { HeadlineBanner } from './HeadlineBanner'
 import { WatchpointsList } from './WatchpointsList'
 import { RiskFlags } from './RiskFlags'
@@ -7,9 +7,10 @@ import { SummaryMetaBadge } from './SummaryMetaBadge'
 
 interface Props {
   summary: PlaybookSummaryType
+  state?: DashboardState
 }
 
-export function PlaybookSummary({ summary }: Props) {
+export function PlaybookSummary({ summary, state }: Props) {
   return (
     <div style={styles.wrapper}>
       <div style={styles.header}>
@@ -20,7 +21,7 @@ export function PlaybookSummary({ summary }: Props) {
       </div>
 
       <div style={styles.sections}>
-        <HeadlineBanner summary={summary} />
+        <HeadlineBanner summary={summary} state={state} />
         <RiskFlags summary={summary} />
         <WatchpointsList summary={summary} />
         <TeachingNote summary={summary} />

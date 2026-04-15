@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 import { fetchPlaybook, fetchLivePlaybook, triggerManualRefresh } from '../api/playbook'
 import type { IndicatorSnapshot } from '../types/indicator'
 import type { CatalystState, LivePlaybookResponse } from '../types/playbook'
+import type { DeterministicSummary } from '../types/summary'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -32,6 +33,7 @@ export interface UsePlaybookDataReturn {
   setPmiSvcOverride: (v: number | null) => void
   status: LoadStatus
   data: PlaybookData | null
+  deterministicSummary?: DeterministicSummary
   errorMessage: string
   refreshing: boolean
   showDebug: boolean
@@ -261,6 +263,8 @@ export function usePlaybookData(): UsePlaybookDataReturn {
     load(mode)
   }, [mode, load])
 
+  const deterministicSummary = data?.state?.deterministic_summary
+
   return {
     mode,
     setMode,
@@ -270,6 +274,7 @@ export function usePlaybookData(): UsePlaybookDataReturn {
     setPmiSvcOverride,
     status,
     data,
+    deterministicSummary,
     errorMessage,
     refreshing,
     showDebug,

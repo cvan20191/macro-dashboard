@@ -67,7 +67,14 @@ function formatLeniencyNotes(notes: string[]): string {
 export function CurrentPlaybookStrip({ summary, state, playbookConclusion }: Props) {
   const rColor = regimeColor(state.primary_regime)
   const rVars = colorVars(rColor)
+  const det = state.deterministic_summary
   const isFallback = summary.meta?.used_fallback
+  const headline = det?.headline ?? summary.headline_summary
+  const subheadline = det?.subheadline ?? null
+  const actionLine = det?.action_line ?? null
+  const deploymentLine = det?.deployment_line ?? null
+  const cohortLine = det?.cohort_line ?? null
+  const cautionLine = det?.caution_line ?? null
 
   return (
     <div style={{ ...s.wrapper, borderLeft: `3px solid ${rVars.fg}` }}>
@@ -89,7 +96,12 @@ export function CurrentPlaybookStrip({ summary, state, playbookConclusion }: Pro
       </div>
 
       {/* Headline */}
-      <p style={s.headline}>{summary.headline_summary}</p>
+      <p style={s.headline}>{headline}</p>
+      {subheadline && <p style={s.expanded}>{subheadline}</p>}
+      {actionLine && <p style={s.inlineLine}>{actionLine}</p>}
+      {deploymentLine && <p style={s.inlineLineMuted}>{deploymentLine}</p>}
+      {cohortLine && <p style={s.inlineLineMuted}>{cohortLine}</p>}
+      {cautionLine && <p style={s.cautionLine}>{cautionLine}</p>}
 
       {/* Posture */}
       <div style={s.postureRow}>
@@ -134,7 +146,7 @@ export function CurrentPlaybookStrip({ summary, state, playbookConclusion }: Pro
       )}
 
       {/* Expanded summary */}
-      <p style={s.expanded}>{summary.expanded_summary}</p>
+      {!det && <p style={s.expanded}>{summary.expanded_summary}</p>}
 
       {/* Risk flags */}
       {summary.risk_flags.length > 0 && (
@@ -259,6 +271,21 @@ const s: Record<string, React.CSSProperties> = {
     fontSize: '13px',
     color: 'var(--text-secondary)',
     lineHeight: 1.7,
+  },
+  inlineLine: {
+    fontSize: '13px',
+    color: 'var(--text-primary)',
+    lineHeight: 1.6,
+  },
+  inlineLineMuted: {
+    fontSize: '13px',
+    color: 'var(--text-secondary)',
+    lineHeight: 1.6,
+  },
+  cautionLine: {
+    fontSize: '13px',
+    color: 'var(--yellow)',
+    lineHeight: 1.6,
   },
   flagsRow: {
     display: 'flex', flexWrap: 'wrap', gap: '6px',
