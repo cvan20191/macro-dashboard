@@ -90,6 +90,16 @@ export interface StagflationTrap {
   oil_risk_active: boolean
 }
 
+export interface PolicyOptionality {
+  constraint_level?: string
+  labor_slack_state?: string
+  inflation_state?: string
+  fed_can_ease?: boolean
+  fed_trapped?: boolean
+  bad_data_is_good_enabled?: boolean
+  note?: string | null
+}
+
 export interface ValuationConstituent {
   ticker: string
   price?: number
@@ -194,6 +204,7 @@ export interface DashboardState {
     reasons?: string[]
   }
   fed_chessboard?: FedChessboard
+  policy_optionality?: PolicyOptionality
   liquidity_plumbing?: LiquidityPlumbing
   stagflation_trap?: StagflationTrap
   valuation?: Valuation

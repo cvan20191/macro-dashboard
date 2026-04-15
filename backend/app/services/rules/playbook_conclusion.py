@@ -18,6 +18,7 @@ from app.schemas.playbook_conclusion import (
     WarningUrgency,
 )
 from app.services.rules.chessboard import ChessboardResult
+from app.services.rules.policy_optionality import PolicyOptionalityResult
 from app.services.rules.rally import RallyResult
 from app.services.rules.regime import RegimeResult
 from app.services.rules.stagflation import StagflationResult
@@ -115,6 +116,7 @@ def _derive_new_cash_action(
     val: ValuationResult,
     stag: StagflationResult,
     stress: StressResult,
+    policy_optionality: PolicyOptionalityResult,
 ) -> NewCashAction:
     transition_path = cb.chessboard.liquidity_transition_path
 
@@ -132,6 +134,7 @@ def _derive_new_cash_action(
         and cb.chessboard.transition_tag in {"Improving", "Stable"}
         and not stag.trap.active
         and not stress.stress_severe
+        and not policy_optionality.fed_trapped
     ):
         return "accumulate_selectively"
     if (
@@ -140,6 +143,7 @@ def _derive_new_cash_action(
         and val.can_support_buy_zone
         and not stag.trap.active
         and not stress.stress_severe
+        and not policy_optionality.fed_trapped
     ):
         return "accumulate_selectively"
     if cb.quadrant == "D":
@@ -281,6 +285,7 @@ def build_playbook_conclusion(
     val: ValuationResult,
     stag: StagflationResult,
     stress: StressResult,
+    policy_optionality: PolicyOptionalityResult,
     rally: RallyResult,
     regime: RegimeResult,
 ) -> PlaybookConclusion:
@@ -308,7 +313,7 @@ def build_playbook_conclusion(
 
     return PlaybookConclusion(
         conclusion_label=regime.primary_regime,
-        new_cash_action=_derive_new_cash_action(cb, val, stag, stress),
+        new_cash_action=_derive_new_cash_action(cb, val, stag, stress, policy_optionality),
         existing_positions_action=_derive_existing_positions_action(cb, val, stag, stress),
         stock_archetype_preferred=preferred,
         stock_archetype_avoid=avoid,

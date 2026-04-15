@@ -13,6 +13,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from app.services.rules.chessboard import ChessboardResult
+from app.services.rules.policy_optionality import PolicyOptionalityResult
 from app.services.rules.rally import RallyResult
 from app.services.rules.stagflation import StagflationResult
 from app.services.rules.stress import DollarResult, StressResult
@@ -41,6 +42,8 @@ O_SYSTEMIC_STRESS = "Systemic Stress Rising"
 O_DOLLAR_PRESSURE = "Dollar Pressure"
 O_VAL_SUPPORTIVE = "Valuation Supportive"
 O_VAL_DANGEROUS = "Valuation Stretched"   # matches zone_label language; non-sensational
+O_FED_TRAPPED = "Fed Trapped"
+O_BAD_DATA_GOOD = "Bad Data Can Be Good"
 
 
 @dataclass
@@ -67,6 +70,7 @@ def _derive_tactical_state(
     stag: StagflationResult,
     val: ValuationResult,
     stress: StressResult,
+    policy_optionality: PolicyOptionalityResult,
 ) -> str:
     transition_path = cb.chessboard.liquidity_transition_path
 
@@ -78,7 +82,7 @@ def _derive_tactical_state(
         if (
             transition_path == "D_to_C"
             and val.can_support_buy_zone
-            and not stag.trap.active
+            and not policy_optionality.fed_trapped
             and not stress.stress_severe
         ):
             return T_START_SLOWLY
@@ -93,7 +97,12 @@ def _derive_tactical_state(
         return T_SELECTIVE
     if val.can_pause_new_buying:
         return T_HOLD_NO_ADD
-    if val.can_support_buy_zone and cb.chessboard.transition_tag in {"Improving", "Stable"} and not stag.trap.active:
+    if (
+        val.can_support_buy_zone
+        and cb.chessboard.transition_tag in {"Improving", "Stable"}
+        and not stag.trap.active
+        and not policy_optionality.fed_trapped
+    ):
         return T_START_SLOWLY
     if stag.trap.active:
         return T_HOLD_NO_ADD
@@ -131,9 +140,10 @@ def compute_regime(
     stress: StressResult,
     dollar: DollarResult,
     rally: RallyResult,
+    policy_optionality: PolicyOptionalityResult,
 ) -> RegimeResult:
     primary_regime = _quadrant_regime_label(cb)
-    tactical_state = _derive_tactical_state(cb, stag, val, stress)
+    tactical_state = _derive_tactical_state(cb, stag, val, stress, policy_optionality)
     legacy_regime_label = _legacy_label(tactical_state, cb, stag, val, stress)
 
     # ── Secondary overlays ───────────────────────────────────────────────────
@@ -153,6 +163,10 @@ def compute_regime(
         overlays.append(O_VAL_SUPPORTIVE)
     if val.can_pause_new_buying:
         overlays.append(O_VAL_DANGEROUS)
+    if policy_optionality.fed_trapped:
+        overlays.append(O_FED_TRAPPED)
+    elif policy_optionality.bad_data_is_good_enabled:
+        overlays.append(O_BAD_DATA_GOOD)
 
     # ── Confidence ───────────────────────────────────────────────────────────
     # Count how many signals align with the classified regime
@@ -164,6 +178,8 @@ def compute_regime(
     if stress.stress_warning_active or stress.stress_severe:
         aligning += 1
     if val.can_support_buy_zone or val.can_pause_new_buying:
+        aligning += 1
+    if policy_optionality.constraint_level in {"free", "trapped"}:
         aligning += 1
     if aligning >= 4:
         confidence = "High"

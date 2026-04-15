@@ -33,6 +33,7 @@ from app.schemas.playbook_conclusion import PlaybookConclusion
 from app.services.rules.chessboard import ChessboardResult, compute_chessboard
 from app.services.rules.liquidity_plumbing import LiquidityPlumbingResult, compute_liquidity_plumbing
 from app.services.rules.playbook_conclusion import build_playbook_conclusion
+from app.services.rules.policy_optionality import PolicyOptionalityResult, compute_policy_optionality
 from app.services.rules.rally import RallyResult, compute_rally
 from app.services.rules.regime import RegimeResult, compute_regime
 from app.services.rules.stagflation import StagflationResult, compute_stagflation
@@ -52,6 +53,7 @@ class _RuleOutputs:
     """Private container for all intermediate rule results."""
     cb: ChessboardResult
     stag: StagflationResult
+    policy_optionality: PolicyOptionalityResult
     val: ValuationResult
     plumbing: LiquidityPlumbingResult
     stress: StressResult
@@ -83,22 +85,25 @@ def _run_rules(snapshot: IndicatorSnapshot) -> _RuleOutputs:
     # ── Step 3: Valuation ─────────────────────────────────────────────────────
     val = compute_valuation(snapshot.valuation)
 
-    # ── Step 4: Liquidity plumbing overlay ────────────────────────────────────
+    # ── Step 4: Policy Optionality ────────────────────────────────────────────
+    policy_optionality = compute_policy_optionality(snapshot.growth, snapshot.inflation)
+
+    # ── Step 5: Liquidity plumbing overlay ────────────────────────────────────
     plumbing = compute_liquidity_plumbing(snapshot.plumbing)
 
-    # ── Step 5: Systemic Stress ───────────────────────────────────────────────
+    # ── Step 6: Systemic Stress ───────────────────────────────────────────────
     stress = compute_stress(snapshot.systemic_stress)
 
-    # ── Step 6: Dollar Context ────────────────────────────────────────────────
+    # ── Step 7: Dollar Context ────────────────────────────────────────────────
     dollar = compute_dollar(snapshot.dollar_context)
 
-    # ── Step 7: Rally Conditions ──────────────────────────────────────────────
+    # ── Step 8: Rally Conditions ──────────────────────────────────────────────
     rally = compute_rally(cb, stag, val, stress, snapshot.policy_support)
 
-    # ── Step 8: Regime ────────────────────────────────────────────────────────
-    regime = compute_regime(cb, stag, val, stress, dollar, rally)
+    # ── Step 9: Regime ────────────────────────────────────────────────────────
+    regime = compute_regime(cb, stag, val, stress, dollar, rally, policy_optionality)
 
-    # ── Step 9: Top Watchpoints ───────────────────────────────────────────────
+    # ── Step 10: Top Watchpoints ──────────────────────────────────────────────
     watchpoints = compute_watchpoints(
         cb, stag, val, stress, dollar, regime.primary_regime, plumbing
     )
@@ -106,15 +111,15 @@ def _run_rules(snapshot: IndicatorSnapshot) -> _RuleOutputs:
         cb, stag, val, stress, dollar, regime.primary_regime, plumbing
     )
 
-    # ── Step 10: What Changed ─────────────────────────────────────────────────
+    # ── Step 11: What Changed ─────────────────────────────────────────────────
     what_changed = compute_what_changed(snapshot, cb, stag, val, stress)
     what_changed_details = compute_what_changed_details(snapshot, cb, stag, val, stress)
 
-    # ── Step 11: What Changes the Call ────────────────────────────────────────
+    # ── Step 12: What Changes the Call ────────────────────────────────────────
     what_changes_call = compute_what_changes_call(regime, val, stag, stress, cb)
     what_changes_call_details = compute_what_changes_call_details(regime, val, stag, stress, cb)
 
-    # ── Step 12: Freshness ────────────────────────────────────────────────────
+    # ── Step 13: Freshness ────────────────────────────────────────────────────
     freshness = DataFreshness(
         overall_status=snapshot.data_freshness.overall_status or "unknown",
         stale_series=snapshot.data_freshness.stale_series,
@@ -123,6 +128,7 @@ def _run_rules(snapshot: IndicatorSnapshot) -> _RuleOutputs:
     return _RuleOutputs(
         cb=cb,
         stag=stag,
+        policy_optionality=policy_optionality,
         val=val,
         plumbing=plumbing,
         stress=stress,
@@ -267,6 +273,7 @@ def _assemble_state(snapshot: IndicatorSnapshot, r: _RuleOutputs) -> DashboardSt
         current_posture=r.regime.current_posture,
         regime_transition=_derive_regime_transition(r),
         fed_chessboard=r.cb.chessboard,
+        policy_optionality=r.policy_optionality.optionality,
         liquidity_plumbing=r.plumbing.plumbing,
         stagflation_trap=r.stag.trap,
         valuation=r.val.valuation,
@@ -310,6 +317,7 @@ def build_dashboard_state_with_conclusion(
         val=r.val,
         stag=r.stag,
         stress=r.stress,
+        policy_optionality=r.policy_optionality,
         rally=r.rally,
         regime=r.regime,
     )

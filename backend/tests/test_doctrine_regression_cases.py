@@ -61,7 +61,13 @@ def make_snapshot(
     coverage_ratio: float = 1.0,
     basis_confidence: float = 1.0,
     core_cpi_yoy: float = 3.0,
+    shelter_status: str = "sticky",
+    services_ex_energy_status: str = "sticky",
+    oil_risk_active: bool = False,
     unemployment_rate: float = 4.2,
+    unemployment_trend: str = "flat",
+    initial_claims_trend: str = "flat",
+    payrolls_trend: str = "flat",
     pmi_manufacturing: float = 49.0,
     pmi_services: float = 52.0,
     fed_put: bool = False,
@@ -134,17 +140,17 @@ def make_snapshot(
             pmi_manufacturing=pmi_manufacturing,
             pmi_services=pmi_services,
             unemployment_rate=unemployment_rate,
-            unemployment_trend="flat",
-            initial_claims_trend="flat",
-            payrolls_trend="flat",
+            unemployment_trend=unemployment_trend,
+            initial_claims_trend=initial_claims_trend,
+            payrolls_trend=payrolls_trend,
         ),
         inflation=InflationInput(
             core_cpi_yoy=core_cpi_yoy,
             core_cpi_mom=0.2,
-            shelter_status="sticky",
-            services_ex_energy_status="sticky",
+            shelter_status=shelter_status,
+            services_ex_energy_status=services_ex_energy_status,
             wti_oil=80.0,
-            oil_risk_active=False,
+            oil_risk_active=oil_risk_active,
         ),
         valuation=ValuationInput(
             forward_pe=forward_pe,
@@ -208,8 +214,12 @@ def test_early_april_2025_is_actual_d_but_transitioning_to_c_with_slow_buying() 
         coverage_count=7,
         coverage_ratio=1.0,
         basis_confidence=1.0,
-        core_cpi_yoy=2.8,
-        unemployment_rate=4.1,
+        core_cpi_yoy=2.7,
+        shelter_status="easing",
+        services_ex_energy_status="easing",
+        unemployment_rate=4.7,
+        unemployment_trend="up",
+        initial_claims_trend="up",
         fed_put=False,
     )
 
@@ -217,6 +227,8 @@ def test_early_april_2025_is_actual_d_but_transitioning_to_c_with_slow_buying() 
 
     assert state.primary_regime.startswith("Quadrant D")
     assert state.fed_chessboard is not None
+    assert state.policy_optionality is not None
+    assert state.policy_optionality.constraint_level in {"limited", "free"}
     assert state.fed_chessboard.liquidity_transition_path == "D_to_C"
     assert state.tactical_state == "Start buying very slowly"
     assert conclusion.new_cash_action == "accumulate_selectively"
@@ -344,3 +356,69 @@ def test_2026_plumbing_stress_marks_walcl_uptick_as_not_qe_in_integrated_state()
     assert state.liquidity_plumbing.state == "severe"
     assert state.liquidity_plumbing.balance_sheet_expansion_not_qe is True
     assert conclusion is not None
+
+
+def test_trapped_environment_blocks_early_transition_buying() -> None:
+    snapshot = make_snapshot(
+        as_of="2025-04-10T00:00:00Z",
+        fed_funds_rate=4.50,
+        rate_direction_medium_term="tightening",
+        rate_impulse_short="stable",
+        balance_sheet_direction_medium_term="contracting",
+        balance_sheet_pace="contracting_slower",
+        forward_pe=23.0,
+        current_year_forward_pe=23.0,
+        next_year_forward_pe=21.0,
+        selected_year=2025,
+        signal_mode="actionable",
+        coverage_count=7,
+        coverage_ratio=1.0,
+        basis_confidence=1.0,
+        core_cpi_yoy=3.2,
+        shelter_status="sticky",
+        services_ex_energy_status="sticky",
+        unemployment_rate=4.1,
+        fed_put=False,
+    )
+
+    state, conclusion = build_dashboard_state_with_conclusion(snapshot)
+
+    assert state.policy_optionality is not None
+    assert state.policy_optionality.constraint_level == "trapped"
+    assert state.tactical_state != "Start buying very slowly"
+    assert conclusion is not None
+    assert conclusion.new_cash_action != "accumulate_selectively"
+
+
+def test_limited_or_free_environment_allows_early_transition_buying() -> None:
+    snapshot = make_snapshot(
+        as_of="2025-04-10T00:00:00Z",
+        fed_funds_rate=4.50,
+        rate_direction_medium_term="tightening",
+        rate_impulse_short="stable",
+        balance_sheet_direction_medium_term="contracting",
+        balance_sheet_pace="contracting_slower",
+        forward_pe=23.0,
+        current_year_forward_pe=23.0,
+        next_year_forward_pe=21.0,
+        selected_year=2025,
+        signal_mode="actionable",
+        coverage_count=7,
+        coverage_ratio=1.0,
+        basis_confidence=1.0,
+        core_cpi_yoy=2.7,
+        shelter_status="easing",
+        services_ex_energy_status="easing",
+        unemployment_rate=4.7,
+        unemployment_trend="up",
+        initial_claims_trend="up",
+        fed_put=False,
+    )
+
+    state, conclusion = build_dashboard_state_with_conclusion(snapshot)
+
+    assert state.policy_optionality is not None
+    assert state.policy_optionality.constraint_level in {"limited", "free"}
+    assert state.tactical_state == "Start buying very slowly"
+    assert conclusion is not None
+    assert conclusion.new_cash_action == "accumulate_selectively"

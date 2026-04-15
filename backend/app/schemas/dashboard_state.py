@@ -72,6 +72,16 @@ class StagflationTrap(BaseModel):
     oil_risk_active: bool = False
 
 
+class PolicyOptionality(BaseModel):
+    constraint_level: str = "unknown"   # free | limited | trapped | unknown
+    labor_slack_state: str = "unknown"  # present | absent | mixed | unknown
+    inflation_state: str = "unknown"    # cooling | sticky_or_hot | mixed | unknown
+    fed_can_ease: bool = False
+    fed_trapped: bool = False
+    bad_data_is_good_enabled: bool = False
+    note: str | None = None
+
+
 class ValuationConstituent(BaseModel):
     ticker: str
     price: float | None = None
@@ -185,6 +195,7 @@ class DashboardState(BaseModel):
     current_posture: str
     regime_transition: RegimeTransition | None = None
     fed_chessboard: FedChessboard | None = None
+    policy_optionality: PolicyOptionality | None = None
     liquidity_plumbing: LiquidityPlumbing | None = None
     stagflation_trap: StagflationTrap | None = None
     valuation: Valuation | None = None
