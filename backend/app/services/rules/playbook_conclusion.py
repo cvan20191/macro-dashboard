@@ -135,6 +135,7 @@ def _derive_new_cash_action(
         and not stag.trap.active
         and not stress.stress_severe
         and not policy_optionality.fed_trapped
+        and not policy_optionality.rate_cut_weirdness_active
     ):
         return "accumulate_selectively"
     if (
@@ -144,6 +145,7 @@ def _derive_new_cash_action(
         and not stag.trap.active
         and not stress.stress_severe
         and not policy_optionality.fed_trapped
+        and not policy_optionality.rate_cut_weirdness_active
     ):
         return "accumulate_selectively"
     if cb.quadrant == "D":

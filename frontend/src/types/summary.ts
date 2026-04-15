@@ -95,10 +95,12 @@ export interface StagflationTrap {
 export interface PolicyOptionality {
   constraint_level?: string
   labor_slack_state?: string
+  labor_balance_state?: string
   inflation_state?: string
   fed_can_ease?: boolean
   fed_trapped?: boolean
   bad_data_is_good_enabled?: boolean
+  rate_cut_weirdness_active?: boolean
   note?: string | null
 }
 

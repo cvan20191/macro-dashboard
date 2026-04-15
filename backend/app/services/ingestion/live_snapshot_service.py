@@ -86,6 +86,7 @@ _FRED_FETCH_MAP: dict[str, tuple[str, str, int, int]] = {
     "unemployment_rate": (FRED_SERIES["unemployment_rate"], "Unemployment Rate",           35,  120),
     "initial_claims":    (FRED_SERIES["initial_claims"],   "Initial Jobless Claims",       10,  120),
     "nonfarm_payrolls":  (FRED_SERIES["nonfarm_payrolls"], "Nonfarm Payrolls",             40,  120),
+    "headline_cpi":      (FRED_SERIES["headline_cpi"],     "Headline CPI",                 35,  120),
     "yield_curve":       (FRED_SERIES["yield_curve"],      "10Y-2Y Yield Spread",          5,   120),
     "npl_ratio":         (FRED_SERIES["npl_ratio"],        "Broad Bank Delinquency Rate",  120, 120),
     "cre_delinquency":   (FRED_SERIES["cre_delinquency"],  "CRE Delinquency Rate",         120, 120),

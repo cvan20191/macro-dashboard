@@ -77,10 +77,12 @@ class StagflationTrap(BaseModel):
 class PolicyOptionality(BaseModel):
     constraint_level: str = "unknown"   # free | limited | trapped | unknown
     labor_slack_state: str = "unknown"  # present | absent | mixed | unknown
+    labor_balance_state: str = "unknown"  # weak_jobs_tight_ur | clean_slack | mixed | unknown
     inflation_state: str = "unknown"    # cooling | sticky_or_hot | mixed | unknown
     fed_can_ease: bool = False
     fed_trapped: bool = False
     bad_data_is_good_enabled: bool = False
+    rate_cut_weirdness_active: bool = False
     note: str | None = None
 
 

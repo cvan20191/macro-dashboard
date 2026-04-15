@@ -44,6 +44,7 @@ O_VAL_SUPPORTIVE = "Valuation Supportive"
 O_VAL_DANGEROUS = "Valuation Stretched"   # matches zone_label language; non-sensational
 O_FED_TRAPPED = "Fed Trapped"
 O_BAD_DATA_GOOD = "Bad Data Can Be Good"
+O_WEIRD_CUT_LOW_ROOM = "Weird Cut / Low Room"
 
 
 @dataclass
@@ -83,6 +84,7 @@ def _derive_tactical_state(
             transition_path == "D_to_C"
             and val.can_support_buy_zone
             and not policy_optionality.fed_trapped
+            and not policy_optionality.rate_cut_weirdness_active
             and not stress.stress_severe
         ):
             return T_START_SLOWLY
@@ -102,6 +104,7 @@ def _derive_tactical_state(
         and cb.chessboard.transition_tag in {"Improving", "Stable"}
         and not stag.trap.active
         and not policy_optionality.fed_trapped
+        and not policy_optionality.rate_cut_weirdness_active
     ):
         return T_START_SLOWLY
     if stag.trap.active:
@@ -167,6 +170,8 @@ def compute_regime(
         overlays.append(O_FED_TRAPPED)
     elif policy_optionality.bad_data_is_good_enabled:
         overlays.append(O_BAD_DATA_GOOD)
+    if policy_optionality.rate_cut_weirdness_active:
+        overlays.append(O_WEIRD_CUT_LOW_ROOM)
 
     # ── Confidence ───────────────────────────────────────────────────────────
     # Count how many signals align with the classified regime

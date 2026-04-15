@@ -62,6 +62,8 @@ class GrowthInput(BaseModel):
 
 
 class InflationInput(BaseModel):
+    headline_cpi_yoy: float | None = None
+    headline_cpi_mom: float | None = None
     core_cpi_yoy: float | None = None
     core_cpi_mom: float | None = None
     shelter_status: str | None = None          # "sticky" | "easing" | "neutral"

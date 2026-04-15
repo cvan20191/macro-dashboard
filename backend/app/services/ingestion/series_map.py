@@ -23,6 +23,7 @@ FRED_SERIES: dict[str, str] = {
     "initial_claims":     "ICSA",            # Initial jobless claims, weekly
     "nonfarm_payrolls":   "PAYEMS",          # Nonfarm payrolls, monthly
     # Inflation (verified FRED series IDs)
+    "headline_cpi":       "CPIAUCSL",        # Headline CPI index, SA, monthly
     "core_cpi":           "CPILFESL",        # Core CPI index, SA, monthly
     "shelter_cpi":        "CUSR0000SAH1",    # CPI Shelter, monthly
     "services_ex_energy": "CUSR0000SASLE",   # CPI Services less energy (verified working)
@@ -63,6 +64,7 @@ FRESHNESS_RULES: dict[str, int] = {
     "unemployment_rate":  65,   # monthly (BLS releases ~4 weeks after month-end)
     "initial_claims":     14,   # weekly (Thursday release)
     "nonfarm_payrolls":   65,   # monthly (BLS first Friday of following month)
+    "headline_cpi":       100,  # monthly index date lags calendar; BLS mid-month release
     "core_cpi":           100,  # monthly index date lags calendar; BLS mid-month release
     "shelter_cpi":        100,
     "services_ex_energy": 100,

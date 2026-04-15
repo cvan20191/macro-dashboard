@@ -521,10 +521,12 @@ def build_indicator_snapshot(
     # ------------------------------------------------------------------
     # Inflation
     # ------------------------------------------------------------------
+    headline_result = raw.get("headline_cpi")
     core_result = raw.get("core_cpi")
     shelter_result = raw.get("shelter_cpi")
     services_result = raw.get("services_ex_energy")
 
+    headline_yoy, headline_mom, _ = compute_yoy_and_status(headline_result) if headline_result else (None, None, "unknown")
     core_yoy, core_mom, _ = compute_yoy_and_status(core_result) if core_result else (None, None, "unknown")
     _, _, shelter_status = compute_yoy_and_status(shelter_result) if shelter_result else (None, None, "unknown")
     _, _, services_status = compute_yoy_and_status(services_result) if services_result else (None, None, "unknown")
@@ -533,6 +535,8 @@ def build_indicator_snapshot(
     oil_risk = (wti_val is not None and wti_val >= 100.0)
 
     inflation = InflationInput(
+        headline_cpi_yoy=headline_yoy,
+        headline_cpi_mom=headline_mom,
         core_cpi_yoy=core_yoy,
         core_cpi_mom=core_mom,
         shelter_status=shelter_status,

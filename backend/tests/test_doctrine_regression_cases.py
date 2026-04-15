@@ -60,6 +60,8 @@ def make_snapshot(
     coverage_count: int = 7,
     coverage_ratio: float = 1.0,
     basis_confidence: float = 1.0,
+    headline_cpi_yoy: float | None = None,
+    headline_cpi_mom: float = 0.2,
     core_cpi_yoy: float = 3.0,
     shelter_status: str = "sticky",
     services_ex_energy_status: str = "sticky",
@@ -145,6 +147,8 @@ def make_snapshot(
             payrolls_trend=payrolls_trend,
         ),
         inflation=InflationInput(
+            headline_cpi_yoy=headline_cpi_yoy if headline_cpi_yoy is not None else core_cpi_yoy,
+            headline_cpi_mom=headline_cpi_mom,
             core_cpi_yoy=core_cpi_yoy,
             core_cpi_mom=0.2,
             shelter_status=shelter_status,
@@ -214,6 +218,7 @@ def test_early_april_2025_is_actual_d_but_transitioning_to_c_with_slow_buying() 
         coverage_count=7,
         coverage_ratio=1.0,
         basis_confidence=1.0,
+        headline_cpi_yoy=2.7,
         core_cpi_yoy=2.7,
         shelter_status="easing",
         services_ex_energy_status="easing",
@@ -250,6 +255,7 @@ def test_after_actual_rate_path_turns_down_regime_becomes_c() -> None:
         coverage_count=7,
         coverage_ratio=1.0,
         basis_confidence=1.0,
+        headline_cpi_yoy=3.0,
         core_cpi_yoy=3.0,
         unemployment_rate=4.3,
         fed_put=False,
@@ -279,6 +285,7 @@ def test_late_september_2025_high_valuation_pauses_new_buying_but_keeps_c() -> N
         coverage_count=7,
         coverage_ratio=1.0,
         basis_confidence=1.0,
+        headline_cpi_yoy=3.0,
         core_cpi_yoy=3.0,
         unemployment_rate=4.3,
         fed_put=True,
@@ -309,6 +316,7 @@ def test_quadrant_b_supportive_valuation_stays_selective_and_blocks_new_cash() -
         coverage_count=7,
         coverage_ratio=1.0,
         basis_confidence=1.0,
+        headline_cpi_yoy=2.9,
         core_cpi_yoy=2.9,
         unemployment_rate=4.0,
         pmi_manufacturing=52.0,
@@ -338,6 +346,7 @@ def test_2026_plumbing_stress_marks_walcl_uptick_as_not_qe_in_integrated_state()
         coverage_count=5,
         coverage_ratio=0.71,
         basis_confidence=0.71,
+        headline_cpi_yoy=2.7,
         core_cpi_yoy=2.7,
         unemployment_rate=4.6,
         plumbing_state="severe",
@@ -374,6 +383,7 @@ def test_plumbing_driven_walcl_uptick_does_not_create_supportive_quadrant() -> N
         coverage_count=5,
         coverage_ratio=0.71,
         basis_confidence=0.71,
+        headline_cpi_yoy=2.7,
         core_cpi_yoy=2.7,
         unemployment_rate=4.6,
         plumbing_state="severe",
@@ -413,6 +423,7 @@ def test_trapped_environment_blocks_early_transition_buying() -> None:
         coverage_count=7,
         coverage_ratio=1.0,
         basis_confidence=1.0,
+        headline_cpi_yoy=3.0,
         core_cpi_yoy=3.2,
         shelter_status="sticky",
         services_ex_energy_status="sticky",
@@ -445,6 +456,7 @@ def test_limited_or_free_environment_allows_early_transition_buying() -> None:
         coverage_count=7,
         coverage_ratio=1.0,
         basis_confidence=1.0,
+        headline_cpi_yoy=2.7,
         core_cpi_yoy=2.7,
         shelter_status="easing",
         services_ex_energy_status="easing",
@@ -461,3 +473,40 @@ def test_limited_or_free_environment_allows_early_transition_buying() -> None:
     assert state.tactical_state == "Start buying very slowly"
     assert conclusion is not None
     assert conclusion.new_cash_action == "accumulate_selectively"
+
+
+def test_weird_cut_environment_blocks_transition_buying_even_with_supportive_valuation() -> None:
+    snapshot = make_snapshot(
+        as_of="2025-09-15T00:00:00Z",
+        fed_funds_rate=4.25,
+        rate_direction_medium_term="easing",
+        rate_impulse_short="confirming_easing",
+        balance_sheet_direction_medium_term="contracting",
+        balance_sheet_pace="contracting_slower",
+        forward_pe=24.5,
+        current_year_forward_pe=24.5,
+        next_year_forward_pe=22.5,
+        selected_year=2025,
+        signal_mode="actionable",
+        coverage_count=7,
+        coverage_ratio=1.0,
+        basis_confidence=1.0,
+        headline_cpi_yoy=2.9,
+        core_cpi_yoy=3.1,
+        shelter_status="sticky",
+        services_ex_energy_status="sticky",
+        unemployment_rate=4.3,
+        unemployment_trend="flat",
+        initial_claims_trend="flat",
+        payrolls_trend="down",
+        pmi_services=52.0,
+        fed_put=False,
+    )
+
+    state, conclusion = build_dashboard_state_with_conclusion(snapshot)
+
+    assert state.policy_optionality is not None
+    assert state.policy_optionality.rate_cut_weirdness_active is True
+    assert state.tactical_state != "Start buying very slowly"
+    assert conclusion is not None
+    assert conclusion.new_cash_action != "accumulate_selectively"
