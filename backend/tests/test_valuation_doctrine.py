@@ -111,3 +111,27 @@ def test_buy_zone_does_not_accumulate_when_liquidity_is_unknown() -> None:
     assert state.fed_chessboard.quadrant == "Unknown"
     assert state.primary_regime == "Quadrant Unknown / Wait"
     assert conclusion.new_cash_action == "hold_and_wait"
+
+
+def test_directional_only_forward_pe_does_not_enable_hard_buy_signal() -> None:
+    result = compute_valuation(
+        ValuationInput(
+            forward_pe=23.0,
+            current_year_forward_pe=23.0,
+            next_year_forward_pe=21.0,
+            selected_year=2026,
+            pe_basis="forward",
+            pe_source_note="speaker forward basket incomplete on selected year",
+            signal_mode="directional_only",
+            basis_confidence=0.5,
+            horizon_label="speaker_calendar_current_year",
+            coverage_count=6,
+            coverage_ratio=0.84,
+            horizon_coverage_ratio=0.72,
+        )
+    )
+
+    assert result.is_buy_zone is True
+    assert result.valuation.signal_mode == "directional_only"
+    assert result.can_support_buy_zone is False
+    assert result.can_pause_new_buying is False

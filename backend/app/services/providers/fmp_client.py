@@ -192,6 +192,17 @@ def _annual_eps_by_year(estimates: list[dict]) -> dict[int, float]:
     return out
 
 
+def _annual_dates_by_year(estimates: list[dict]) -> dict[int, str]:
+    out: dict[int, str] = {}
+    for row in estimates:
+        row_date = _get_estimate_date(row)
+        eps = _get_forward_eps(row)
+        if row_date is None or eps is None:
+            continue
+        out[row_date.year] = row_date.strftime("%Y-%m-%d")
+    return out
+
+
 def fetch_mag7_constituent_payloads(
     api_key: str,
     timeout: int = 20,
@@ -224,6 +235,7 @@ def fetch_mag7_constituent_payloads(
                 "shares": shares,
                 "market_cap": mktcap,
                 "annual_eps_by_year": _annual_eps_by_year(estimates),
+                "estimate_dates_by_year": _annual_dates_by_year(estimates),
                 "estimate_as_of": today,
             }
         )
