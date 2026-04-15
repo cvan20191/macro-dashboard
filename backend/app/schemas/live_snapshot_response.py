@@ -28,7 +28,7 @@ class LivePlaybookResponse(BaseModel):
     snapshot: IndicatorSnapshot
     state: DashboardState
     playbook_conclusion: PlaybookConclusion | None = None
-    summary: PlaybookSummary
+    summary: PlaybookSummary | None = None
     catalysts: CatalystState = Field(default_factory=CatalystState)
     sources: dict[str, SourceMeta]
     overall_status: str

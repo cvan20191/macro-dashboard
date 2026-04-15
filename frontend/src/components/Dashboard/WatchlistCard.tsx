@@ -1,7 +1,10 @@
-import type { PlaybookSummary } from '../../types/summary'
+import type { DashboardState, PlaybookSummary } from '../../types/summary'
 import { Card } from '../ui/Card'
 
-interface Props { summary: PlaybookSummary }
+interface Props {
+  state?: DashboardState | null
+  summary?: PlaybookSummary | null
+}
 
 function BulletSection({ title, items, accentColor }: { title: string; items: string[]; accentColor: string }) {
   return (
@@ -33,14 +36,18 @@ function BulletSection({ title, items, accentColor }: { title: string; items: st
   )
 }
 
-export function WatchlistCard({ summary }: Props) {
+export function WatchlistCard({ state, summary }: Props) {
+  const watchNow = state?.top_watchpoints?.length ? state.top_watchpoints : (summary?.watch_now ?? [])
+  const whatChanged = state?.what_changed?.length ? state.what_changed : (summary?.what_changed_bullets ?? [])
+  const whatChangesCall = state?.what_changes_call?.length ? state.what_changes_call : (summary?.what_changes_call_bullets ?? [])
+
   return (
     <Card title="Watch Now · What Changed · What Changes the Call">
-      <BulletSection title="Watch Now" items={summary.watch_now} accentColor="var(--blue)" />
+      <BulletSection title="Watch Now" items={watchNow} accentColor="var(--blue)" />
       <div style={{ height: '1px', background: 'var(--border-subtle)' }} />
-      <BulletSection title="What Changed" items={summary.what_changed_bullets} accentColor="var(--yellow)" />
+      <BulletSection title="What Changed" items={whatChanged} accentColor="var(--yellow)" />
       <div style={{ height: '1px', background: 'var(--border-subtle)' }} />
-      <BulletSection title="What Would Change the Call" items={summary.what_changes_call_bullets} accentColor="var(--green)" />
+      <BulletSection title="What Would Change the Call" items={whatChangesCall} accentColor="var(--green)" />
     </Card>
   )
 }

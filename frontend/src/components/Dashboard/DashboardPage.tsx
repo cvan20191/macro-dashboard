@@ -1,4 +1,4 @@
-import type { DashboardState, FedChessboard, StagflationTrap, Valuation, SystemicStress, RallyConditions, DollarContext, PlaybookSummary } from '../../types/summary'
+import type { DashboardState, FedChessboard, StagflationTrap, Valuation, SystemicStress, RallyConditions, DollarContext } from '../../types/summary'
 import type { SourceMeta } from '../../types/playbook'
 import { usePlaybookData } from '../../hooks/usePlaybookData'
 import { SourceStatusStrip } from './SourceStatusStrip'
@@ -169,14 +169,12 @@ export function DashboardPage() {
         {/* Main dashboard */}
         {status === 'success' && data && (() => {
           const state = normalizeState(data.state)
-          const summary = data.summary
 
           return (
             <div className="dashboard-grid" style={s.grid}>
               {/* Row 1: Current Playbook strip — full width */}
               <div style={{ gridColumn: '1 / -1' }}>
                 <CurrentPlaybookStrip
-                  summary={summary}
                   state={state}
                   playbookConclusion={data.playbook_conclusion}
                 />
@@ -216,7 +214,7 @@ export function DashboardPage() {
 
               {/* Row 4: Systemic Stress + Watchlist */}
               <SystemicStressCard stress={state.systemic_stress} sources={sources} />
-              <WatchlistCard summary={summary as PlaybookSummary} />
+              <WatchlistCard state={state} summary={data.summary} />
 
               {/* Row 5: Things to Look Out For — full width */}
               {data.catalysts && (

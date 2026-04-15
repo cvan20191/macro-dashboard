@@ -21,7 +21,7 @@ export function PlaybookSummary({ summary, state }: Props) {
       </div>
 
       <div style={styles.sections}>
-        <HeadlineBanner summary={summary} state={state} />
+        <HeadlineBanner state={state} />
         <RiskFlags summary={summary} />
         <WatchpointsList summary={summary} />
         <TeachingNote summary={summary} />

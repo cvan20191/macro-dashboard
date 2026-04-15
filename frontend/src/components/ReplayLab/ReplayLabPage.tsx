@@ -6,7 +6,7 @@
 //              assessment comparison + OutcomeReviewCard + ReplayContextPanel.
 
 import { useState } from 'react'
-import type { FedChessboard, StagflationTrap, Valuation, SystemicStress, DollarContext, RallyConditions, PlaybookSummary, DashboardState } from '../../types/summary'
+import type { FedChessboard, StagflationTrap, Valuation, SystemicStress, DollarContext, RallyConditions, DashboardState } from '../../types/summary'
 import type { SourceMeta } from '../../types/playbook'
 import { useReplayData } from '../../hooks/useReplayData'
 import { FedChessboardCard } from '../Dashboard/FedChessboardCard'
@@ -151,7 +151,6 @@ export function ReplayLabPage({ onGoLive }: Props) {
               {revealed && (
                 <div style={{ gridColumn: '1 / -1' }}>
                   <CurrentPlaybookStrip
-                    summary={summary}
                     state={state}
                     playbookConclusion={playbook.playbook_conclusion}
                   />
@@ -178,7 +177,7 @@ export function ReplayLabPage({ onGoLive }: Props) {
 
               {/* In revealed mode: show Watchlist */}
               {revealed && (
-                <WatchlistCard summary={summary as PlaybookSummary} />
+                <WatchlistCard state={state} summary={summary} />
               )}
 
               {/* In blind mode: assessment form — full width */}

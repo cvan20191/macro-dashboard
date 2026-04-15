@@ -1,8 +1,7 @@
-import type { DashboardState, PlaybookSummary } from '../../types/summary'
+import type { DashboardState } from '../../types/summary'
 
 interface Props {
-  summary?: PlaybookSummary | null
-  state?: DashboardState
+  state?: DashboardState | null
 }
 
 const REGIME_COLORS: Record<string, { bg: string; border: string; text: string }> = {
@@ -27,13 +26,13 @@ const DEFAULT_REGIME_COLOR = {
   text: 'var(--blue)',
 }
 
-export function HeadlineBanner({ state, summary }: Props) {
+export function HeadlineBanner({ state }: Props) {
   const det = state?.deterministic_summary
-  const regimeLabel = state?.primary_regime ?? summary?.regime_label ?? 'Quadrant Unknown / Wait'
-  const postureLabel = state?.current_posture ?? summary?.posture_label ?? 'Wait for cleaner signal'
+  const regimeLabel = state?.primary_regime ?? 'Quadrant Unknown / Wait'
+  const postureLabel = state?.current_posture ?? 'Wait for cleaner signal'
   const regimeColor = REGIME_COLORS[regimeLabel] ?? DEFAULT_REGIME_COLOR
-  const headline = det?.headline ?? summary?.headline_summary ?? 'Macro Playbook'
-  const expanded = det?.subheadline ?? summary?.expanded_summary ?? null
+  const headline = det?.headline ?? state?.primary_regime ?? 'Macro Playbook'
+  const expanded = det?.subheadline ?? null
   const actionLine = det?.action_line ?? null
   const cautionLine = det?.caution_line ?? null
 

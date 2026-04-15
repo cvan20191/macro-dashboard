@@ -41,7 +41,6 @@ from app.services.rules.cohort_forward_pe import (
 )
 from app.services.rules.dashboard_state_builder import build_dashboard_state_with_conclusion
 from app.services.rules.deterministic_summary import build_deterministic_summary
-from app.services.summary_engine import generate_summary
 
 logger = logging.getLogger(__name__)
 
@@ -551,7 +550,7 @@ async def get_live_playbook(
     pmi_services_override: float | None = None,
 ) -> LivePlaybookResponse:
     """
-    Full live pipeline: providers → snapshot → rule engine → LLM summary → catalysts.
+    Full live pipeline: providers → snapshot → rule engine → deterministic summary → catalysts.
     """
     snapshot_resp = await get_live_snapshot(
         force_refresh=force_refresh,
@@ -584,7 +583,6 @@ async def get_live_playbook(
         playbook_conclusion = playbook_conclusion.model_copy(
             update={"tactical_overlay_label": macro.tactical_posture_modifier},
         )
-    summary = await generate_summary(state, conclusion=playbook_conclusion)
 
     catalyst_config = load_catalyst_config()
     catalysts = build_catalyst_state(catalyst_config, snapshot, state)
@@ -593,7 +591,7 @@ async def get_live_playbook(
         snapshot=snapshot,
         state=state,
         playbook_conclusion=playbook_conclusion,
-        summary=summary,
+        summary=None,
         catalysts=catalysts,
         sources=snapshot_resp.sources,
         overall_status=snapshot_resp.overall_status,

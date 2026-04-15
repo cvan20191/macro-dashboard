@@ -1,11 +1,9 @@
-import type { PlaybookSummary } from '../../types/summary'
 import type { DashboardState } from '../../types/summary'
 import type { PlaybookConclusion } from '../../types/playbook'
 import { StatusPill } from '../ui/StatusPill'
 import { regimeColor, confidenceColor, colorVars } from '../../lib/colors'
 
 interface Props {
-  summary: PlaybookSummary
   state: DashboardState
   playbookConclusion?: PlaybookConclusion
 }
@@ -64,12 +62,11 @@ function formatLeniencyNotes(notes: string[]): string {
   return notes.map(note => LENIENCY_LABEL[note] ?? humanizeTag(note)).join(', ')
 }
 
-export function CurrentPlaybookStrip({ summary, state, playbookConclusion }: Props) {
+export function CurrentPlaybookStrip({ state, playbookConclusion }: Props) {
   const rColor = regimeColor(state.primary_regime)
   const rVars = colorVars(rColor)
   const det = state.deterministic_summary
-  const isFallback = summary.meta?.used_fallback
-  const headline = det?.headline ?? summary.headline_summary
+  const headline = det?.headline ?? state.primary_regime ?? 'Unknown regime'
   const subheadline = det?.subheadline ?? null
   const actionLine = det?.action_line ?? null
   const deploymentLine = det?.deployment_line ?? null
@@ -90,9 +87,6 @@ export function CurrentPlaybookStrip({ summary, state, playbookConclusion }: Pro
             <StatusPill key={o} label={o} colorKey="muted" size="sm" />
           ))}
         </div>
-        {isFallback && (
-          <span style={s.fallbackNote}>Deterministic summary (LLM offline)</span>
-        )}
       </div>
 
       {/* Headline */}
@@ -145,42 +139,8 @@ export function CurrentPlaybookStrip({ summary, state, playbookConclusion }: Pro
         </div>
       )}
 
-      {/* Expanded summary */}
-      {!det && <p style={s.expanded}>{summary.expanded_summary}</p>}
-
       {/* Risk flags */}
-      {summary.risk_flags.length > 0 && (
-        <div style={s.flagsRow}>
-          {summary.risk_flags.map(f => (
-            <RiskFlag key={f} label={f} />
-          ))}
-        </div>
-      )}
-
-      {/* Teaching note */}
-      <div style={s.teachingNote}>
-        <span style={s.teachingIcon}>⟳</span>
-        <span style={s.teachingText}>{summary.teaching_note}</span>
-      </div>
     </div>
-  )
-}
-
-function RiskFlag({ label }: { label: string }) {
-  const isRed = /stretched|warning|stress|crash|stagflation|illiquid/i.test(label)
-  const isGreen = /active|supportive|rally/i.test(label)
-  const color = isRed ? 'var(--red)' : isGreen ? 'var(--green)' : 'var(--yellow)'
-  const bg = isRed ? 'var(--red-bg)' : isGreen ? 'var(--green-bg)' : 'var(--yellow-bg)'
-  const border = isRed ? 'var(--red-dim)' : isGreen ? 'var(--green-dim)' : 'var(--yellow-dim)'
-  return (
-    <span style={{
-      display: 'inline-flex', alignItems: 'center',
-      padding: '2px 9px', borderRadius: '3px',
-      fontSize: '11px', fontWeight: 600,
-      background: bg, color, border: `1px solid ${border}`,
-    }}>
-      {label}
-    </span>
   )
 }
 
@@ -203,15 +163,6 @@ const s: Record<string, React.CSSProperties> = {
   },
   badges: {
     display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center',
-  },
-  fallbackNote: {
-    fontSize: '10px',
-    color: 'var(--text-muted)',
-    fontStyle: 'italic',
-    background: 'var(--bg-card-raised)',
-    padding: '2px 8px',
-    borderRadius: '3px',
-    border: '1px solid var(--border-subtle)',
   },
   headline: {
     fontSize: '17px',
@@ -286,28 +237,5 @@ const s: Record<string, React.CSSProperties> = {
     fontSize: '13px',
     color: 'var(--yellow)',
     lineHeight: 1.6,
-  },
-  flagsRow: {
-    display: 'flex', flexWrap: 'wrap', gap: '6px',
-  },
-  teachingNote: {
-    display: 'flex',
-    alignItems: 'flex-start',
-    gap: '8px',
-    padding: '10px 14px',
-    background: 'var(--blue-bg)',
-    borderRadius: 'var(--radius-sm)',
-    border: '1px solid var(--blue-dim)',
-  },
-  teachingIcon: {
-    fontSize: '13px',
-    color: 'var(--blue)',
-    flexShrink: 0,
-  },
-  teachingText: {
-    fontSize: '12px',
-    color: 'var(--blue)',
-    lineHeight: 1.6,
-    fontStyle: 'italic',
   },
 }
