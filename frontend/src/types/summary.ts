@@ -207,6 +207,14 @@ export interface EquityProfileGuidance {
   note?: string | null
 }
 
+export interface ExitDisciplineSignal {
+  active?: boolean
+  scope?: string
+  rate_reversal_watch_active?: boolean
+  qe_fade_watch_active?: boolean
+  note?: string | null
+}
+
 export interface DashboardState {
   as_of?: string
   data_freshness: DataFreshness
@@ -236,6 +244,7 @@ export interface DashboardState {
   rally_conditions?: RallyConditions
   exposure_guidance?: ExposureGuidance
   equity_profile_guidance?: EquityProfileGuidance
+  exit_discipline_signal?: ExitDisciplineSignal
   top_watchpoints: string[]
   top_watchpoint_details?: Array<{ code: string; text: string }>
   what_changed: string[]

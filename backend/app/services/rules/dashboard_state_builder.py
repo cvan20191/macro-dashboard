@@ -31,6 +31,7 @@ from app.schemas.dashboard_state import DataFreshness, DashboardState, ReasonedT
 from app.schemas.indicator_snapshot import IndicatorSnapshot
 from app.schemas.playbook_conclusion import PlaybookConclusion
 from app.services.rules.chessboard import ChessboardResult, compute_chessboard
+from app.services.rules.exit_discipline import ExitDisciplineResult, compute_exit_discipline_signal
 from app.services.rules.liquidity_plumbing import LiquidityPlumbingResult, compute_liquidity_plumbing
 from app.services.rules.playbook_conclusion import build_playbook_conclusion
 from app.services.rules.policy_optionality import PolicyOptionalityResult, compute_policy_optionality
@@ -60,6 +61,7 @@ class _RuleOutputs:
     dollar: object
     rally: RallyResult
     regime: RegimeResult
+    exit_signal: ExitDisciplineResult
     watchpoints: list
     watchpoint_details: list[ReasonedText]
     what_changed: list
@@ -103,7 +105,10 @@ def _run_rules(snapshot: IndicatorSnapshot) -> _RuleOutputs:
     # ── Step 9: Regime ────────────────────────────────────────────────────────
     regime = compute_regime(cb, stag, val, stress, dollar, rally, policy_optionality)
 
-    # ── Step 10: Top Watchpoints ──────────────────────────────────────────────
+    # ── Step 10: Exit Discipline ─────────────────────────────────────────────
+    exit_signal = compute_exit_discipline_signal(cb)
+
+    # ── Step 11: Top Watchpoints ──────────────────────────────────────────────
     watchpoints = compute_watchpoints(
         cb, stag, val, stress, dollar, regime.primary_regime, plumbing
     )
@@ -111,15 +116,15 @@ def _run_rules(snapshot: IndicatorSnapshot) -> _RuleOutputs:
         cb, stag, val, stress, dollar, regime.primary_regime, plumbing
     )
 
-    # ── Step 11: What Changed ─────────────────────────────────────────────────
+    # ── Step 12: What Changed ─────────────────────────────────────────────────
     what_changed = compute_what_changed(snapshot, cb, stag, val, stress)
     what_changed_details = compute_what_changed_details(snapshot, cb, stag, val, stress)
 
-    # ── Step 12: What Changes the Call ────────────────────────────────────────
+    # ── Step 13: What Changes the Call ────────────────────────────────────────
     what_changes_call = compute_what_changes_call(regime, val, stag, stress, cb)
     what_changes_call_details = compute_what_changes_call_details(regime, val, stag, stress, cb)
 
-    # ── Step 13: Freshness ────────────────────────────────────────────────────
+    # ── Step 14: Freshness ────────────────────────────────────────────────────
     freshness = DataFreshness(
         overall_status=snapshot.data_freshness.overall_status or "unknown",
         stale_series=snapshot.data_freshness.stale_series,
@@ -135,6 +140,7 @@ def _run_rules(snapshot: IndicatorSnapshot) -> _RuleOutputs:
         dollar=dollar,
         rally=rally,
         regime=regime,
+        exit_signal=exit_signal,
         watchpoints=watchpoints,
         watchpoint_details=watchpoint_details,
         what_changed=what_changed,
@@ -282,6 +288,7 @@ def _assemble_state(snapshot: IndicatorSnapshot, r: _RuleOutputs) -> DashboardSt
         rally_conditions=r.rally.conditions,
         exposure_guidance=r.regime.exposure_guidance,
         equity_profile_guidance=r.regime.equity_profile_guidance,
+        exit_discipline_signal=r.exit_signal.signal,
         top_watchpoints=r.watchpoints,
         top_watchpoint_details=r.watchpoint_details,
         what_changed=r.what_changed,

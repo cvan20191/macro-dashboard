@@ -191,6 +191,14 @@ class EquityProfileGuidance(BaseModel):
     note: str | None = None
 
 
+class ExitDisciplineSignal(BaseModel):
+    active: bool = False
+    scope: str = "none"  # stock_d_type_a_regime | none
+    rate_reversal_watch_active: bool = False
+    qe_fade_watch_active: bool = False
+    note: str | None = None
+
+
 class ReasonedText(BaseModel):
     code: str
     text: str
@@ -227,6 +235,7 @@ class DashboardState(BaseModel):
     rally_conditions: RallyConditions | None = None
     exposure_guidance: ExposureGuidance | None = None
     equity_profile_guidance: EquityProfileGuidance | None = None
+    exit_discipline_signal: ExitDisciplineSignal | None = None
     top_watchpoints: list[str] = Field(default_factory=list)
     top_watchpoint_details: list[ReasonedText] = Field(default_factory=list)
     what_changed: list[str] = Field(default_factory=list)

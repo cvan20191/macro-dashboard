@@ -282,6 +282,46 @@ def test_early_april_transition_surfaces_emerging_c_profile_while_actual_profile
     assert conclusion.new_cash_action == "accumulate_selectively"
 
 
+def test_a_regime_exit_signal_appears_when_liquidity_support_stops_confirming() -> None:
+    snapshot = make_snapshot(
+        as_of="2026-02-15T00:00:00Z",
+        fed_funds_rate=3.50,
+        rate_direction_medium_term="easing",
+        rate_impulse_short="mixed",
+        balance_sheet_direction_medium_term="expanding",
+        balance_sheet_pace="expanding_same_or_faster",
+        forward_pe=24.0,
+        current_year_forward_pe=24.0,
+        next_year_forward_pe=22.0,
+        selected_year=2026,
+        signal_mode="actionable",
+        coverage_count=7,
+        coverage_ratio=1.0,
+        basis_confidence=1.0,
+        core_cpi_yoy=2.4,
+        unemployment_rate=5.0,
+        fed_put=False,
+    )
+
+    snapshot.inflation.headline_cpi_yoy = 2.5
+    snapshot.inflation.services_ex_energy_status = "cooling"
+    snapshot.inflation.shelter_status = "cooling"
+    snapshot.growth.pmi_services = 49.0
+    snapshot.growth.payrolls_trend = "down"
+    snapshot.growth.unemployment_trend = "up"
+    snapshot.growth.initial_claims_trend = "up"
+
+    state, conclusion = build_dashboard_state_with_conclusion(snapshot)
+
+    assert state.primary_regime.startswith("Quadrant A")
+    assert state.equity_profile_guidance is not None
+    assert state.equity_profile_guidance.primary_profile_code == "stock_d_type"
+    assert state.exit_discipline_signal is not None
+    assert state.exit_discipline_signal.active is True
+    assert state.exit_discipline_signal.rate_reversal_watch_active is True
+    assert conclusion is not None
+
+
 def test_after_actual_rate_path_turns_down_regime_becomes_c() -> None:
     snapshot = make_snapshot(
         as_of="2025-09-01T00:00:00Z",
