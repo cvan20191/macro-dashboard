@@ -45,6 +45,10 @@ _BALANCE_SHEET_DELTA_THRESHOLD = 25_000.0  # WALCL is in millions USD => 25B thr
 _UNEMPLOYMENT_DELTA_THRESHOLD = 0.05
 _CLAIMS_PCT_THRESHOLD = 0.03
 _PAYROLLS_DELTA_THRESHOLD = 25.0
+_PLUMBING_RESERVE_TREND_LOOKBACK_DAYS = 28
+_PLUMBING_RESERVE_BUFFER_LOOKBACK_DAYS = 182
+_PLUMBING_FLOW_TREND_LOOKBACK_DAYS = 28
+_PLUMBING_FLOW_BUFFER_LOOKBACK_DAYS = 180
 
 
 def _parse_series_date(raw: str) -> date | None:
@@ -291,14 +295,32 @@ def build_indicator_snapshot(
     )
     plumbing = PlumbingInput(
         total_reserves=get_val("total_reserves"),
-        reserves_trend_1m=_trend_by_relative_change(get_series("total_reserves"), 35, 0.01),
-        reserves_buffer_ratio=_median_ratio(get_series("total_reserves"), 210),
+        reserves_trend_1m=_trend_by_relative_change(
+            get_series("total_reserves"),
+            _PLUMBING_RESERVE_TREND_LOOKBACK_DAYS,
+            0.01,
+        ),
+        reserves_buffer_ratio=_median_ratio(
+            get_series("total_reserves"),
+            _PLUMBING_RESERVE_BUFFER_LOOKBACK_DAYS,
+        ),
         repo_total=get_val("repo_total"),
-        repo_trend_1m=_trend_by_relative_change(get_series("repo_total"), 28, 0.10),
-        repo_spike_ratio=_median_ratio(get_series("repo_total"), 180),
+        repo_trend_1m=_trend_by_relative_change(
+            get_series("repo_total"),
+            _PLUMBING_FLOW_TREND_LOOKBACK_DAYS,
+            0.10,
+        ),
+        repo_spike_ratio=_median_ratio(get_series("repo_total"), _PLUMBING_FLOW_BUFFER_LOOKBACK_DAYS),
         reverse_repo_total=get_val("reverse_repo_total"),
-        reverse_repo_trend_1m=_trend_by_relative_change(get_series("reverse_repo_total"), 28, 0.10),
-        reverse_repo_buffer_ratio=_median_ratio(get_series("reverse_repo_total"), 180),
+        reverse_repo_trend_1m=_trend_by_relative_change(
+            get_series("reverse_repo_total"),
+            _PLUMBING_FLOW_TREND_LOOKBACK_DAYS,
+            0.10,
+        ),
+        reverse_repo_buffer_ratio=_median_ratio(
+            get_series("reverse_repo_total"),
+            _PLUMBING_FLOW_BUFFER_LOOKBACK_DAYS,
+        ),
         walcl_trend_1m=_trend_by_absolute_delta(bs_series, 28, _BALANCE_SHEET_DELTA_THRESHOLD),
     )
 

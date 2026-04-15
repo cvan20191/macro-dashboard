@@ -42,7 +42,7 @@ from app.services.summary_engine import generate_summary
 logger = logging.getLogger(__name__)
 
 # Bump when snapshot shape / provider mix changes so TTL cache + disk recovery are not stale.
-_LIVE_SNAPSHOT_CACHE_VERSION = 8  # bumped: quadrant-first valuation/plumbing snapshot shape
+_LIVE_SNAPSHOT_CACHE_VERSION = 9  # bumped: weekly reserve-balance plumbing input
 # Same-day in-memory cache for successful FMP Mag 7 valuation results only.
 _FMP_VALUATION_DAY_CACHE: dict[str, FetchResult] = {}
 
@@ -80,7 +80,7 @@ _FRED_FETCH_MAP: dict[str, tuple[str, str, int, int]] = {
     # a cycle position for the chessboard's policy stance inference.
     "fed_funds_rate":    (FRED_SERIES["fed_funds_rate"],   "Fed Funds Upper Bound",        5,   1100),
     "balance_sheet":     (FRED_SERIES["balance_sheet"],    "Fed Balance Sheet",            10,  120),
-    "total_reserves":    (FRED_SERIES["total_reserves"],   "Total Reserves",               35,  365),
+    "total_reserves":    (FRED_SERIES["total_reserves"],   "Reserve Balances",             10,  210),
     "repo_total":        (FRED_SERIES["repo_total"],       "Total Repo Operations",        5,   240),
     "reverse_repo_total": (FRED_SERIES["reverse_repo_total"], "Total Reverse Repo Operations", 5, 240),
     "unemployment_rate": (FRED_SERIES["unemployment_rate"], "Unemployment Rate",           35,  120),

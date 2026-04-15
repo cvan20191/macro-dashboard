@@ -36,7 +36,7 @@ _FRED_HIST_MAP: dict[str, tuple[str, str, str, int]] = {
     # 1100d window so normalizer has 36 months of history for cycle position computation
     "fed_funds_rate":    (FRED_SERIES["fed_funds_rate"],    "Fed Funds Upper Bound",        "daily",     1100),
     "balance_sheet":     (FRED_SERIES["balance_sheet"],     "Fed Balance Sheet",            "weekly",    120),
-    "total_reserves":    (FRED_SERIES["total_reserves"],    "Total Reserves",               "monthly",   365),
+    "total_reserves":    (FRED_SERIES["total_reserves"],    "Reserve Balances",             "weekly",    210),
     "repo_total":        (FRED_SERIES["repo_total"],        "Total Repo Operations",        "daily",     240),
     "reverse_repo_total": (FRED_SERIES["reverse_repo_total"], "Total Reverse Repo Operations", "daily",   240),
     "unemployment_rate": (FRED_SERIES["unemployment_rate"], "Unemployment Rate",            "monthly",   180),
