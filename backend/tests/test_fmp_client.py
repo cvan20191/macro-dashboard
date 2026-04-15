@@ -5,6 +5,7 @@ from app.services.providers.fmp_client import (
     _annual_dates_by_year,
     _annual_eps_by_year,
     _get_price,
+    fetch_constituent_payloads,
     fetch_mag7_constituent_payloads,
 )
 
@@ -36,7 +37,7 @@ def test_annual_dates_by_year_extracts_raw_year_buckets() -> None:
     }
 
 
-def test_fetch_mag7_constituent_payloads_returns_raw_annual_estimate_payloads(monkeypatch) -> None:
+def test_fetch_constituent_payloads_returns_raw_annual_estimate_payloads(monkeypatch) -> None:
     monkeypatch.setattr(
         fmp_client,
         "fetch_profiles_batch",
@@ -57,7 +58,11 @@ def test_fetch_mag7_constituent_payloads_returns_raw_annual_estimate_payloads(mo
         ],
     )
 
-    payloads = fetch_mag7_constituent_payloads(api_key="demo", timeout=5, tickers=["AAPL"])
+    payloads = fetch_constituent_payloads(
+        tickers=["AAPL"],
+        api_key="demo",
+        timeout=5,
+    )
 
     assert payloads == [
         {
@@ -70,3 +75,15 @@ def test_fetch_mag7_constituent_payloads_returns_raw_annual_estimate_payloads(mo
             "estimate_as_of": payloads[0]["estimate_as_of"],
         }
     ]
+
+
+def test_fetch_mag7_constituent_payloads_wraps_generic_fetcher(monkeypatch) -> None:
+    monkeypatch.setattr(
+        fmp_client,
+        "fetch_constituent_payloads",
+        lambda *, tickers, api_key, timeout: [{"ticker": tickers[0], "api_key": api_key, "timeout": timeout}],
+    )
+
+    payloads = fetch_mag7_constituent_payloads(api_key="demo", timeout=5, tickers=["AAPL"])
+
+    assert payloads == [{"ticker": "AAPL", "api_key": "demo", "timeout": 5}]

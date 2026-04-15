@@ -1,5 +1,5 @@
 """
-Financial Modeling Prep (FMP) provider — used exclusively for the Mag 7 Forward P/E basket.
+Financial Modeling Prep (FMP) provider — used for transcript cohort forward-P/E baskets.
 
 Endpoints used:
   GET /stable/profile?symbol=AAPL,MSFT,...  — market cap, price, shares outstanding
@@ -203,23 +203,23 @@ def _annual_dates_by_year(estimates: list[dict]) -> dict[int, str]:
     return out
 
 
-def fetch_mag7_constituent_payloads(
+def fetch_constituent_payloads(
+    tickers: list[str],
+    *,
     api_key: str,
     timeout: int = 20,
-    tickers: list[str] | None = None,
 ) -> list[dict]:
-    mag7 = tickers or MAG7_TICKERS
+    payloads: list[dict] = []
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
     try:
-        profiles = fetch_profiles_batch(mag7, api_key, timeout)
+        profiles = fetch_profiles_batch(tickers, api_key, timeout)
     except ProviderError as exc:
         raise ProviderError(f"FMP profile batch failed: {exc}") from exc
 
-    payloads: list[dict] = []
-    for ticker in mag7:
+    for ticker in tickers:
         profile = profiles.get(ticker, {})
-        mktcap = _get_market_cap(profile)
+        market_cap = _get_market_cap(profile)
         shares = _get_shares(profile)
         price = _get_price(profile)
 
@@ -228,15 +228,29 @@ def fetch_mag7_constituent_payloads(
         except ProviderError as exc:
             logger.warning("FMP analyst-estimates failed for %s: %s", ticker, exc)
             estimates = []
+
         payloads.append(
             {
                 "ticker": ticker,
                 "price": price,
                 "shares": shares,
-                "market_cap": mktcap,
+                "market_cap": market_cap,
                 "annual_eps_by_year": _annual_eps_by_year(estimates),
                 "estimate_dates_by_year": _annual_dates_by_year(estimates),
                 "estimate_as_of": today,
             }
         )
+
     return payloads
+
+
+def fetch_mag7_constituent_payloads(
+    api_key: str,
+    timeout: int = 20,
+    tickers: list[str] | None = None,
+) -> list[dict]:
+    return fetch_constituent_payloads(
+        tickers=tickers or MAG7_TICKERS,
+        api_key=api_key,
+        timeout=timeout,
+    )

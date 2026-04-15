@@ -99,6 +99,22 @@ class ValuationConstituent(BaseModel):
     basis_confidence: float | None = None
 
 
+class CohortValuation(BaseModel):
+    cohort_code: str
+    label: str
+    forward_pe: float | None = None
+    current_year_forward_pe: float | None = None
+    next_year_forward_pe: float | None = None
+    selected_year: int | None = None
+    horizon_label: str | None = None
+    signal_mode: SignalMode = "directional_only"
+    coverage_count: int | None = None
+    coverage_ratio: float | None = None
+    basis_confidence: float | None = None
+    note: str | None = None
+    tickers: list[str] = Field(default_factory=list)
+
+
 class Valuation(BaseModel):
     forward_pe: float | None = None
     current_year_forward_pe: float | None = None
@@ -131,6 +147,7 @@ class Valuation(BaseModel):
     horizon_coverage_ratio: float | None = None
     # per-ticker breakdown for the FMP Mag 7 basket
     constituents: list[ValuationConstituent] = Field(default_factory=list)
+    cohort_valuations: list[CohortValuation] = Field(default_factory=list)
 
 
 class SystemicStress(BaseModel):

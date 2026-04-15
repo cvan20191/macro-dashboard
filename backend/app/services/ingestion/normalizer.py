@@ -571,6 +571,7 @@ def build_indicator_snapshot(
         horizon_label=_pe_extra.get("horizon_label"),
         horizon_coverage_ratio=_pe_extra.get("horizon_coverage_ratio"),
         constituents=_pe_extra.get("constituents", []),
+        cohort_valuations=_pe_extra.get("cohort_valuations", []),
     )
 
     # ------------------------------------------------------------------

@@ -117,6 +117,22 @@ export interface ValuationConstituent {
   basis_confidence?: number
 }
 
+export interface CohortValuation {
+  cohort_code?: string
+  label?: string
+  forward_pe?: number
+  current_year_forward_pe?: number
+  next_year_forward_pe?: number
+  selected_year?: number
+  horizon_label?: string | null
+  signal_mode?: string
+  coverage_count?: number
+  coverage_ratio?: number
+  basis_confidence?: number
+  note?: string | null
+  tickers?: string[]
+}
+
 export interface Valuation {
   forward_pe?: number
   current_year_forward_pe?: number
@@ -145,6 +161,7 @@ export interface Valuation {
   horizon_coverage_ratio?: number
   // per-ticker breakdown — only populated for FMP Mag 7 basket
   constituents?: ValuationConstituent[]
+  cohort_valuations?: CohortValuation[]
 }
 
 export interface SystemicStress {

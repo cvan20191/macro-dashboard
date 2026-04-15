@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from app.schemas.indicator_snapshot import (
+    CohortValuationInput,
     GrowthInput,
     IndicatorSnapshot,
     InflationInput,
@@ -135,3 +136,57 @@ def test_directional_only_forward_pe_does_not_enable_hard_buy_signal() -> None:
     assert result.valuation.signal_mode == "directional_only"
     assert result.can_support_buy_zone is False
     assert result.can_pause_new_buying is False
+
+
+def test_legacy_forward_pe_remains_mag7_while_multi_cohort_state_is_exposed() -> None:
+    result = compute_valuation(
+        ValuationInput(
+            forward_pe=24.0,
+            current_year_forward_pe=24.0,
+            next_year_forward_pe=22.0,
+            selected_year=2026,
+            pe_basis="forward",
+            pe_source_note="legacy Mag 7",
+            signal_mode="actionable",
+            basis_confidence=1.0,
+            horizon_label="speaker_fye_proximity_current_year",
+            coverage_count=7,
+            coverage_ratio=1.0,
+            horizon_coverage_ratio=1.0,
+            cohort_valuations=[
+                CohortValuationInput(
+                    cohort_code="mag7",
+                    label="Mag 7",
+                    forward_pe=24.0,
+                    current_year_forward_pe=24.0,
+                    next_year_forward_pe=22.0,
+                    selected_year=2026,
+                    horizon_label="speaker_fye_proximity_current_year",
+                    signal_mode="actionable",
+                    coverage_count=7,
+                    coverage_ratio=1.0,
+                    basis_confidence=1.0,
+                    tickers=["AAPL", "MSFT"],
+                ),
+                CohortValuationInput(
+                    cohort_code="non_mag7_ai",
+                    label="Non-Mag7 AI",
+                    forward_pe=27.0,
+                    current_year_forward_pe=27.0,
+                    next_year_forward_pe=25.0,
+                    selected_year=2026,
+                    horizon_label="speaker_fye_proximity_current_year",
+                    signal_mode="directional_only",
+                    coverage_count=4,
+                    coverage_ratio=0.78,
+                    basis_confidence=0.78,
+                    tickers=["ORCL", "PLTR"],
+                ),
+            ],
+        )
+    )
+
+    assert result.valuation.forward_pe == 24.0
+    assert len(result.valuation.cohort_valuations) == 2
+    assert result.valuation.cohort_valuations[0].cohort_code == "mag7"
+    assert result.valuation.cohort_valuations[1].cohort_code == "non_mag7_ai"

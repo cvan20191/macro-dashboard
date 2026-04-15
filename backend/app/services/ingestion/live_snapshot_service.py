@@ -28,15 +28,18 @@ from app.services.ingestion.series_map import (
 )
 from app.services.providers.base import FetchResult, ProviderError
 from app.services.providers.cpi_provider import fetch_cpi_components
-from app.services.providers.fmp_client import fetch_mag7_constituent_payloads
+from app.services.providers.fmp_client import fetch_constituent_payloads
 from app.services.providers.fred_client import fetch_series
 from app.services.providers.pmi_provider import fetch_pmi_manufacturing, fetch_pmi_services
 from app.services.providers.yahoo_client import fetch_pe_ratio_proxy, fetch_ticker
 from app.services.catalysts.config_loader import load_catalyst_config
 from app.services.catalysts.engine import build_catalyst_state
 from app.services.macro_expectations_service import get_macro_expectations_state
+from app.services.rules.cohort_forward_pe import (
+    compute_cohort_forward_pe_baskets,
+    load_equity_cohort_registry,
+)
 from app.services.rules.dashboard_state_builder import build_dashboard_state_with_conclusion
-from app.services.rules.speaker_forward_pe import compute_speaker_forward_pe
 from app.services.summary_engine import generate_summary
 
 logger = logging.getLogger(__name__)
@@ -244,14 +247,51 @@ def _fetch_valuation(timeout: int, force_refresh: bool = False) -> FetchResult:
             )
             return cached
 
-    # Try FMP Mag 7 basket
+    # Try FMP transcript cohort baskets; legacy forward_pe remains the Mag 7 anchor.
     try:
-        payloads = fetch_mag7_constituent_payloads(api_key=fmp_key, timeout=timeout)
-        basket = compute_speaker_forward_pe(payloads, as_of=date.today())
-        if basket.valid and basket.speaker_forward_pe is not None:
+        registry = load_equity_cohort_registry()
+        unique_tickers: list[str] = []
+        seen: set[str] = set()
+        for config in registry.values():
+            for raw_ticker in config.get("tickers", []):
+                ticker = str(raw_ticker)
+                if ticker not in seen:
+                    seen.add(ticker)
+                    unique_tickers.append(ticker)
+
+        payloads = fetch_constituent_payloads(
+            tickers=unique_tickers,
+            api_key=fmp_key,
+            timeout=timeout,
+        )
+        baskets = compute_cohort_forward_pe_baskets(
+            payloads=payloads,
+            as_of=date.today(),
+            registry=registry,
+        )
+        mag7_basket = next((basket for basket in baskets if basket.cohort_code == "mag7"), None)
+        if mag7_basket is not None and mag7_basket.forward_pe is not None:
             today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+            cohort_valuations = [
+                {
+                    "cohort_code": basket.cohort_code,
+                    "label": basket.label,
+                    "forward_pe": basket.forward_pe,
+                    "current_year_forward_pe": basket.current_year_forward_pe,
+                    "next_year_forward_pe": basket.next_year_forward_pe,
+                    "selected_year": basket.selected_year,
+                    "horizon_label": basket.horizon_label,
+                    "signal_mode": basket.signal_mode,
+                    "coverage_count": basket.coverage_count,
+                    "coverage_ratio": basket.coverage_ratio,
+                    "basis_confidence": basket.basis_confidence,
+                    "note": basket.note,
+                    "tickers": basket.tickers,
+                }
+                for basket in baskets
+            ]
             result = FetchResult(
-                value=basket.speaker_forward_pe,
+                value=mag7_basket.forward_pe,
                 observed_at=today,
                 series=[],
                 provider="FMP",
@@ -259,7 +299,7 @@ def _fetch_valuation(timeout: int, force_refresh: bool = False) -> FetchResult:
                 series_name="Mag 7 Forward P/E Basket",
                 frequency="daily",
                 status="fresh",
-                note=basket.note,
+                note=mag7_basket.note,
                 source_class="licensed",
                 confidence_weight=default_confidence_weight("licensed"),
                 release_date=today,
@@ -270,26 +310,26 @@ def _fetch_valuation(timeout: int, force_refresh: bool = False) -> FetchResult:
                     "metric_name": "Mag 7 Forward P/E",
                     "object_label": "Mag 7 Basket",
                     "provider": "fmp",
-                    "coverage_count": basket.coverage_count,
-                    "coverage_ratio": basket.coverage_ratio,
-                    "signal_mode": basket.signal_mode,
-                    "basis_confidence": basket.basis_confidence,
+                    "coverage_count": mag7_basket.coverage_count,
+                    "coverage_ratio": mag7_basket.coverage_ratio,
+                    "signal_mode": mag7_basket.signal_mode,
+                    "basis_confidence": mag7_basket.basis_confidence,
                     "estimate_as_of": today,
-                    "horizon_label": basket.horizon_label,
-                    "horizon_coverage_ratio": basket.horizon_coverage_ratio,
-                    "current_year_forward_pe": basket.current_year_forward_pe,
-                    "next_year_forward_pe": basket.next_year_forward_pe,
-                    "selected_year": basket.selected_year,
-                    "constituents": basket.constituents,
+                    "horizon_label": mag7_basket.horizon_label,
+                    "horizon_coverage_ratio": mag7_basket.coverage_ratio,
+                    "current_year_forward_pe": mag7_basket.current_year_forward_pe,
+                    "next_year_forward_pe": mag7_basket.next_year_forward_pe,
+                    "selected_year": mag7_basket.selected_year,
+                    "constituents": [],
+                    "cohort_valuations": cohort_valuations,
                 },
             )
             _FMP_VALUATION_DAY_CACHE[cache_day] = result
-            logger.info("Valuation: FMP Mag 7 basket succeeded (P/E=%.2f)", result.value)
+            logger.info("Valuation: FMP cohort baskets succeeded (legacy Mag 7 P/E=%.2f)", result.value)
             return result
-        # basket returned but coverage was insufficient
-        logger.warning("Valuation: FMP basket insufficient coverage — falling back to Yahoo")
+        logger.warning("Valuation: FMP cohort baskets insufficient coverage — falling back to Yahoo")
     except ProviderError as exc:
-        logger.warning("Valuation: FMP basket failed (%s) — falling back to Yahoo", exc)
+        logger.warning("Valuation: FMP cohort baskets failed (%s) — falling back to Yahoo", exc)
 
     # Fallback: Yahoo QQQ proxy
     return _fetch_yahoo_valuation_fallback(timeout)

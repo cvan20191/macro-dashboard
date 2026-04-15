@@ -1,0 +1,22 @@
+{
+  "mag7": {
+    "label": "Mag 7",
+    "tickers": ["AAPL", "MSFT", "NVDA", "AMZN", "GOOGL", "META", "TSLA"],
+    "note": "Transcript-explicit A cohort."
+  },
+  "non_mag7_ai": {
+    "label": "Non-Mag7 AI",
+    "tickers": ["ORCL", "PLTR", "AMD", "AVGO", "MU"],
+    "note": "Transcript-explicit B cohort examples."
+  },
+  "non_ai_high_valuation": {
+    "label": "Non-AI High Earnings / High Valuation",
+    "tickers": ["COST"],
+    "note": "Transcript-explicit C cohort seed. Unresolved AAA token intentionally omitted until clarified."
+  },
+  "non_ai_low_valuation_defensive": {
+    "label": "Non-AI Low Valuation / Defensive",
+    "tickers": ["BMY", "PFE"],
+    "note": "Transcript-explicit D cohort examples."
+  }
+}

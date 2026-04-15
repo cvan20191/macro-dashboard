@@ -72,6 +72,22 @@ class InflationInput(BaseModel):
     oil_risk_active: bool | None = None
 
 
+class CohortValuationInput(BaseModel):
+    cohort_code: str
+    label: str
+    forward_pe: float | None = None
+    current_year_forward_pe: float | None = None
+    next_year_forward_pe: float | None = None
+    selected_year: int | None = None
+    horizon_label: str | None = None
+    signal_mode: SignalMode = "directional_only"
+    coverage_count: int | None = None
+    coverage_ratio: float | None = None
+    basis_confidence: float | None = None
+    note: str | None = None
+    tickers: list[str] = Field(default_factory=list)
+
+
 class ValuationInput(BaseModel):
     forward_pe: float | None = None
     current_year_forward_pe: float | None = None
@@ -98,6 +114,7 @@ class ValuationInput(BaseModel):
     # per-ticker breakdown — only populated for the FMP Mag 7 basket
     # each entry: {ticker, price, forward_eps, forward_pe} (forward_pe may be None)
     constituents: list[dict] = Field(default_factory=list)
+    cohort_valuations: list[CohortValuationInput] = Field(default_factory=list)
 
 
 class SystemicStressInput(BaseModel):

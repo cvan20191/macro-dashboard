@@ -20,8 +20,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from app.doctrine import DEFAULT_DOCTRINE_PROFILE, can_drive_hard_action
-from app.schemas.dashboard_state import Valuation, ValuationConstituent
-from app.schemas.indicator_snapshot import ValuationInput
+from app.schemas.dashboard_state import CohortValuation, Valuation, ValuationConstituent
+from app.schemas.indicator_snapshot import CohortValuationInput, ValuationInput
 
 # Speaker-defined heuristic thresholds
 BUY_ZONE_LOW = DEFAULT_DOCTRINE_PROFILE.bigtech_pe_buy_low.value
@@ -57,6 +57,32 @@ class ValuationResult:
     can_support_buy_zone: bool
 
 
+def _build_cohort_valuations(
+    rows: list[CohortValuationInput | dict],
+) -> list[CohortValuation]:
+    valuations: list[CohortValuation] = []
+    for row in rows:
+        cohort = row if isinstance(row, CohortValuationInput) else CohortValuationInput(**row)
+        valuations.append(
+            CohortValuation(
+                cohort_code=cohort.cohort_code,
+                label=cohort.label,
+                forward_pe=cohort.forward_pe,
+                current_year_forward_pe=cohort.current_year_forward_pe,
+                next_year_forward_pe=cohort.next_year_forward_pe,
+                selected_year=cohort.selected_year,
+                horizon_label=cohort.horizon_label,
+                signal_mode=cohort.signal_mode,
+                coverage_count=cohort.coverage_count,
+                coverage_ratio=cohort.coverage_ratio,
+                basis_confidence=cohort.basis_confidence,
+                note=cohort.note,
+                tickers=cohort.tickers,
+            )
+        )
+    return valuations
+
+
 def compute_valuation(val_input: ValuationInput) -> ValuationResult:
     pe = val_input.forward_pe
     current_year_pe = val_input.current_year_forward_pe
@@ -82,6 +108,7 @@ def compute_valuation(val_input: ValuationInput) -> ValuationResult:
         ValuationConstituent(**c) if isinstance(c, dict) else c
         for c in (val_input.constituents or [])
     ]
+    cohort_valuations = _build_cohort_valuations(list(val_input.cohort_valuations or []))
 
     if pe is None:
         return ValuationResult(
@@ -110,6 +137,7 @@ def compute_valuation(val_input: ValuationInput) -> ValuationResult:
                 horizon_label=horizon_label,
                 horizon_coverage_ratio=horizon_coverage_ratio,
                 constituents=constituents,
+                cohort_valuations=cohort_valuations,
             ),
             zone="Neutral",
             is_stretched=False,
@@ -163,6 +191,7 @@ def compute_valuation(val_input: ValuationInput) -> ValuationResult:
         horizon_label=horizon_label,
         horizon_coverage_ratio=horizon_coverage_ratio,
         constituents=constituents,
+        cohort_valuations=cohort_valuations,
     )
     hard_action_enabled = can_drive_hard_action(signal_mode)
 
