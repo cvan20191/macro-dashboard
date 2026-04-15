@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from app.schemas.dashboard_state import FedChessboard
+from app.schemas.dashboard_state import FedChessboard, LiquidityPlumbing
 from app.schemas.indicator_snapshot import LiquidityInput
 
 def _legacy_rate_direction_medium_term(liq: LiquidityInput) -> str:
@@ -71,25 +71,59 @@ class ChessboardResult:
     quadrant: str  # "A" | "B" | "C" | "D" | "Unknown"
 
 
-def compute_chessboard(liq: LiquidityInput) -> ChessboardResult:
+def _effective_balance_sheet_direction(
+    *,
+    raw_direction: str,
+    plumbing: LiquidityPlumbing | None,
+) -> tuple[str, str, str | None]:
+    """
+    Keep the raw WALCL direction for audit, but prevent plumbing-driven
+    balance-sheet support from masquerading as supportive QE liquidity.
+    """
+    if raw_direction == "expanding" and plumbing is not None and plumbing.balance_sheet_expansion_not_qe:
+        return (
+            "flat_or_mixed",
+            "plumbing_support_not_qe",
+            "Raw balance-sheet expansion is being treated as plumbing support, not QE.",
+        )
+
+    if raw_direction == "expanding":
+        return ("expanding", "supportive_expansion", None)
+    if raw_direction == "contracting":
+        return ("contracting", "contracting", None)
+    return ("flat_or_mixed", "flat_or_mixed", None)
+
+
+def compute_chessboard(
+    liq: LiquidityInput,
+    plumbing: LiquidityPlumbing | None = None,
+) -> ChessboardResult:
     rate_direction = liq.rate_direction_medium_term or _legacy_rate_direction_medium_term(liq)
     rate_impulse_short = liq.rate_impulse_short or _legacy_rate_impulse_short(liq, rate_direction)
-    balance_sheet_direction = (
+    raw_balance_sheet_direction = (
         liq.balance_sheet_direction_medium_term
         or _legacy_balance_sheet_direction_medium_term(liq)
     )
-    balance_sheet_pace = liq.balance_sheet_pace or _legacy_balance_sheet_pace(liq, balance_sheet_direction)
+    balance_sheet_pace = liq.balance_sheet_pace or _legacy_balance_sheet_pace(liq, raw_balance_sheet_direction)
+    (
+        effective_balance_sheet_direction,
+        balance_sheet_liquidity_interpretation,
+        bs_liquidity_note,
+    ) = _effective_balance_sheet_direction(
+        raw_direction=raw_balance_sheet_direction,
+        plumbing=plumbing,
+    )
 
-    if rate_direction == "easing" and balance_sheet_direction == "expanding":
+    if rate_direction == "easing" and effective_balance_sheet_direction == "expanding":
         quadrant = "A"
         label = "MAX LIQUIDITY"
-    elif rate_direction == "tightening" and balance_sheet_direction == "expanding":
+    elif rate_direction == "tightening" and effective_balance_sheet_direction == "expanding":
         quadrant = "B"
         label = "MIXED LIQUIDITY: BALANCE SHEET SUPPORT"
-    elif rate_direction == "easing" and balance_sheet_direction == "contracting":
+    elif rate_direction == "easing" and effective_balance_sheet_direction == "contracting":
         quadrant = "C"
         label = "TRANSITION TO EASIER MONEY"
-    elif rate_direction == "tightening" and balance_sheet_direction == "contracting":
+    elif rate_direction == "tightening" and effective_balance_sheet_direction == "contracting":
         quadrant = "D"
         label = "MAX ILLIQUIDITY"
     else:
@@ -97,14 +131,17 @@ def compute_chessboard(liq: LiquidityInput) -> ChessboardResult:
         label = "AMBIGUOUS / WAIT FOR CLEANER SIGNAL"
 
     liquidity_transition_path = "none"
-    transition_basis_note: str | None = None
+    transition_basis_note: str | None = bs_liquidity_note
 
     if quadrant == "D" and balance_sheet_pace == "contracting_slower" and rate_impulse_short in {"stable", "mixed"}:
         liquidity_transition_path = "D_to_C"
         transition_tag = "Improving"
-        transition_basis_note = (
+        d_to_c_note = (
             "Actual quadrant remains D, but the path is transitioning toward C because QT is "
             "still ongoing but slowing and the rate path is no longer actively tightening."
+        )
+        transition_basis_note = (
+            f"{transition_basis_note} {d_to_c_note}" if transition_basis_note else d_to_c_note
         )
     elif quadrant == "A":
         transition_tag = "Improving"
@@ -136,17 +173,19 @@ def compute_chessboard(liq: LiquidityInput) -> ChessboardResult:
         direction_vs_1m_ago=direction,
         policy_stance=None,
         rate_impulse=rate_impulse_short,
-        balance_sheet_direction=balance_sheet_direction,
+        balance_sheet_direction=effective_balance_sheet_direction,
         balance_sheet_pace=balance_sheet_pace,
         rate_direction_medium_term=rate_direction,
         rate_impulse_short=rate_impulse_short,
-        balance_sheet_direction_medium_term=balance_sheet_direction,
+        balance_sheet_direction_medium_term=raw_balance_sheet_direction,
+        effective_balance_sheet_direction=effective_balance_sheet_direction,
+        balance_sheet_liquidity_interpretation=balance_sheet_liquidity_interpretation,
         liquidity_transition_path=liquidity_transition_path,
         transition_tag=transition_tag,
         quadrant_basis_note=(
             liq.quadrant_basis_note
-            or "Quadrant uses the actual medium-term policy-rate path and actual medium-term "
-            "Fed balance-sheet path; transition is handled separately."
+            or "Quadrant uses the actual medium-term policy-rate path and the effective market "
+            "liquidity read from the Fed balance-sheet path."
         ),
         transition_basis_note=transition_basis_note,
     )

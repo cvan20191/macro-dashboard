@@ -76,20 +76,20 @@ def _run_rules(snapshot: IndicatorSnapshot) -> _RuleOutputs:
     This is the single source of truth for rule computation. Both public
     builder functions delegate here so computation is never duplicated.
     """
-    # ── Step 1: Fed Chessboard ────────────────────────────────────────────────
-    cb = compute_chessboard(snapshot.liquidity)
+    # ── Step 1: Liquidity plumbing overlay ────────────────────────────────────
+    plumbing = compute_liquidity_plumbing(snapshot.plumbing)
 
-    # ── Step 2: Stagflation Trap ──────────────────────────────────────────────
+    # ── Step 2: Fed Chessboard ────────────────────────────────────────────────
+    cb = compute_chessboard(snapshot.liquidity, plumbing=plumbing.plumbing)
+
+    # ── Step 3: Stagflation Trap ──────────────────────────────────────────────
     stag = compute_stagflation(snapshot.growth, snapshot.inflation)
 
-    # ── Step 3: Valuation ─────────────────────────────────────────────────────
+    # ── Step 4: Valuation ─────────────────────────────────────────────────────
     val = compute_valuation(snapshot.valuation)
 
-    # ── Step 4: Policy Optionality ────────────────────────────────────────────
+    # ── Step 5: Policy Optionality ────────────────────────────────────────────
     policy_optionality = compute_policy_optionality(snapshot.growth, snapshot.inflation)
-
-    # ── Step 5: Liquidity plumbing overlay ────────────────────────────────────
-    plumbing = compute_liquidity_plumbing(snapshot.plumbing)
 
     # ── Step 6: Systemic Stress ───────────────────────────────────────────────
     stress = compute_stress(snapshot.systemic_stress)

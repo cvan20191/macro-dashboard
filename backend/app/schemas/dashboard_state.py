@@ -29,6 +29,8 @@ class FedChessboard(BaseModel):
     rate_direction_medium_term: str | None = None
     rate_impulse_short: str | None = None
     balance_sheet_direction_medium_term: str | None = None
+    effective_balance_sheet_direction: str | None = None
+    balance_sheet_liquidity_interpretation: str | None = None
     liquidity_transition_path: str | None = None
     transition_tag: str | None = None
     quadrant_basis_note: str | None = None

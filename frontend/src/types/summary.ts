@@ -50,6 +50,8 @@ export interface FedChessboard {
   rate_direction_medium_term?: string
   rate_impulse_short?: string
   balance_sheet_direction_medium_term?: string
+  effective_balance_sheet_direction?: string
+  balance_sheet_liquidity_interpretation?: string
   quadrant_basis_note?: string | null
   transition_basis_note?: string | null
 }

@@ -358,6 +358,45 @@ def test_2026_plumbing_stress_marks_walcl_uptick_as_not_qe_in_integrated_state()
     assert conclusion is not None
 
 
+def test_plumbing_driven_walcl_uptick_does_not_create_supportive_quadrant() -> None:
+    snapshot = make_snapshot(
+        as_of="2026-01-15T00:00:00Z",
+        fed_funds_rate=4.00,
+        rate_direction_medium_term="easing",
+        rate_impulse_short="stable",
+        balance_sheet_direction_medium_term="expanding",
+        balance_sheet_pace="expanding_same_or_faster",
+        forward_pe=26.0,
+        current_year_forward_pe=26.0,
+        next_year_forward_pe=24.0,
+        selected_year=2026,
+        signal_mode="directional_only",
+        coverage_count=5,
+        coverage_ratio=0.71,
+        basis_confidence=0.71,
+        core_cpi_yoy=2.7,
+        unemployment_rate=4.6,
+        plumbing_state="severe",
+        walcl_trend_1m="up",
+        reserves_trend_1m="down",
+        repo_trend_1m="up",
+        reverse_repo_trend_1m="down",
+        repo_spike_ratio=3.0,
+        reverse_repo_buffer_ratio=0.25,
+        fed_put=False,
+    )
+
+    state, conclusion = build_dashboard_state_with_conclusion(snapshot)
+
+    assert state.fed_chessboard is not None
+    assert state.fed_chessboard.balance_sheet_direction_medium_term == "expanding"
+    assert state.fed_chessboard.effective_balance_sheet_direction == "flat_or_mixed"
+    assert state.fed_chessboard.balance_sheet_liquidity_interpretation == "plumbing_support_not_qe"
+    assert state.primary_regime.startswith("Quadrant Unknown")
+    assert conclusion is not None
+    assert conclusion.new_cash_action == "hold_and_wait"
+
+
 def test_trapped_environment_blocks_early_transition_buying() -> None:
     snapshot = make_snapshot(
         as_of="2025-04-10T00:00:00Z",
