@@ -195,6 +195,18 @@ export interface ExposureGuidance {
   note?: string | null
 }
 
+export interface EquityProfileGuidance {
+  primary_profile_code?: string
+  primary_profile_label?: string
+  secondary_profile_code?: string | null
+  secondary_profile_label?: string | null
+  emerging_profile_code?: string | null
+  emerging_profile_label?: string | null
+  exit_discipline_required?: boolean
+  same_sector_peer_compare_required?: boolean
+  note?: string | null
+}
+
 export interface DashboardState {
   as_of?: string
   data_freshness: DataFreshness
@@ -223,6 +235,7 @@ export interface DashboardState {
   dollar_context?: DollarContext
   rally_conditions?: RallyConditions
   exposure_guidance?: ExposureGuidance
+  equity_profile_guidance?: EquityProfileGuidance
   top_watchpoints: string[]
   top_watchpoint_details?: Array<{ code: string; text: string }>
   what_changed: string[]

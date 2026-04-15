@@ -281,6 +281,7 @@ def _assemble_state(snapshot: IndicatorSnapshot, r: _RuleOutputs) -> DashboardSt
         dollar_context=r.dollar.dollar,
         rally_conditions=r.rally.conditions,
         exposure_guidance=r.regime.exposure_guidance,
+        equity_profile_guidance=r.regime.equity_profile_guidance,
         top_watchpoints=r.watchpoints,
         top_watchpoint_details=r.watchpoint_details,
         what_changed=r.what_changed,

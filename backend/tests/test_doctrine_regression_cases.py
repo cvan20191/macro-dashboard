@@ -242,6 +242,46 @@ def test_early_april_2025_is_actual_d_but_transitioning_to_c_with_slow_buying() 
     assert conclusion.new_cash_action == "accumulate_selectively"
 
 
+def test_early_april_transition_surfaces_emerging_c_profile_while_actual_profile_stays_defensive() -> None:
+    snapshot = make_snapshot(
+        as_of="2025-04-10T00:00:00Z",
+        fed_funds_rate=4.50,
+        rate_direction_medium_term="tightening",
+        rate_impulse_short="stable",
+        balance_sheet_direction_medium_term="contracting",
+        balance_sheet_pace="contracting_slower",
+        forward_pe=23.0,
+        current_year_forward_pe=23.0,
+        next_year_forward_pe=21.0,
+        selected_year=2025,
+        signal_mode="actionable",
+        coverage_count=7,
+        coverage_ratio=1.0,
+        basis_confidence=1.0,
+        core_cpi_yoy=2.8,
+        unemployment_rate=4.7,
+        fed_put=False,
+    )
+
+    snapshot.inflation.headline_cpi_yoy = 2.5
+    snapshot.inflation.services_ex_energy_status = "cooling"
+    snapshot.inflation.shelter_status = "cooling"
+    snapshot.growth.pmi_services = 49.0
+    snapshot.growth.payrolls_trend = "down"
+    snapshot.growth.unemployment_trend = "up"
+    snapshot.growth.initial_claims_trend = "up"
+
+    state, conclusion = build_dashboard_state_with_conclusion(snapshot)
+
+    assert state.primary_regime.startswith("Quadrant D")
+    assert state.equity_profile_guidance is not None
+    assert state.equity_profile_guidance.primary_profile_code == "stock_a_type"
+    assert state.equity_profile_guidance.emerging_profile_code == "stock_c_type"
+    assert state.tactical_state == "Start buying very slowly"
+    assert conclusion is not None
+    assert conclusion.new_cash_action == "accumulate_selectively"
+
+
 def test_after_actual_rate_path_turns_down_regime_becomes_c() -> None:
     snapshot = make_snapshot(
         as_of="2025-09-01T00:00:00Z",

@@ -179,6 +179,18 @@ class ExposureGuidance(BaseModel):
     note: str | None = None
 
 
+class EquityProfileGuidance(BaseModel):
+    primary_profile_code: str = "wait"
+    primary_profile_label: str = "Wait / no preferred equity profile"
+    secondary_profile_code: str | None = None
+    secondary_profile_label: str | None = None
+    emerging_profile_code: str | None = None
+    emerging_profile_label: str | None = None
+    exit_discipline_required: bool = False
+    same_sector_peer_compare_required: bool = True
+    note: str | None = None
+
+
 class ReasonedText(BaseModel):
     code: str
     text: str
@@ -214,6 +226,7 @@ class DashboardState(BaseModel):
     dollar_context: DollarContext | None = None
     rally_conditions: RallyConditions | None = None
     exposure_guidance: ExposureGuidance | None = None
+    equity_profile_guidance: EquityProfileGuidance | None = None
     top_watchpoints: list[str] = Field(default_factory=list)
     top_watchpoint_details: list[ReasonedText] = Field(default_factory=list)
     what_changed: list[str] = Field(default_factory=list)

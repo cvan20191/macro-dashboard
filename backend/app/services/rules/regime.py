@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from app.schemas.dashboard_state import ExposureGuidance
+from app.schemas.dashboard_state import EquityProfileGuidance, ExposureGuidance
 from app.services.rules.chessboard import ChessboardResult
 from app.services.rules.policy_optionality import PolicyOptionalityResult
 from app.services.rules.rally import RallyResult
@@ -57,6 +57,7 @@ class RegimeResult:
     confidence: str
     current_posture: str
     exposure_guidance: ExposureGuidance
+    equity_profile_guidance: EquityProfileGuidance
 
 
 def _quadrant_regime_label(cb: ChessboardResult) -> str:
@@ -179,6 +180,72 @@ def _derive_exposure_guidance(cb: ChessboardResult) -> ExposureGuidance:
     )
 
 
+def _derive_equity_profile_guidance(cb: ChessboardResult) -> EquityProfileGuidance:
+    transition_path = cb.chessboard.liquidity_transition_path
+
+    if cb.quadrant == "A":
+        return EquityProfileGuidance(
+            primary_profile_code="stock_d_type",
+            primary_profile_label="Hyper-growth / loss-making / highly leveraged",
+            exit_discipline_required=True,
+            same_sector_peer_compare_required=True,
+            note=(
+                "Most liquid regime. Company D type works best, but exit discipline is mandatory at any sign "
+                "of rates turning back up or liquidity support fading."
+            ),
+        )
+    if cb.quadrant == "B":
+        return EquityProfileGuidance(
+            primary_profile_code="stock_b_type",
+            primary_profile_label="Moderate growth / moderate leverage / some profitability",
+            secondary_profile_code="stock_c_type",
+            secondary_profile_label="High growth / high leverage / refinancing beneficiary",
+            same_sector_peer_compare_required=True,
+            note=(
+                "Mixed liquidity. Company B type is preferred; company C type can also work, but B is safer "
+                "under rising-rate pressure."
+            ),
+        )
+    if cb.quadrant == "C":
+        return EquityProfileGuidance(
+            primary_profile_code="stock_c_type",
+            primary_profile_label="High growth / high leverage / refinancing beneficiary",
+            secondary_profile_code="stock_b_type",
+            secondary_profile_label="Moderate growth / moderate leverage / some profitability",
+            same_sector_peer_compare_required=True,
+            note=(
+                "Transition liquidity. Company C type is preferred; company B type can also work, "
+                "but C benefits more from falling rates and refinancing relief."
+            ),
+        )
+    if cb.quadrant == "D":
+        if transition_path == "D_to_C":
+            return EquityProfileGuidance(
+                primary_profile_code="stock_a_type",
+                primary_profile_label="Stable / low valuation / low leverage / solvent",
+                emerging_profile_code="stock_c_type",
+                emerging_profile_label="Emerging C-type: high growth / refinancing beneficiary",
+                same_sector_peer_compare_required=True,
+                note=(
+                    "Actual quadrant remains D, so company A type remains the defensive anchor. "
+                    "Because the market is transitioning from D toward C, company C type can begin to emerge, "
+                    "but only very slowly."
+                ),
+            )
+        return EquityProfileGuidance(
+            primary_profile_code="stock_a_type",
+            primary_profile_label="Stable / low valuation / low leverage / solvent",
+            same_sector_peer_compare_required=True,
+            note="Least liquid regime. Company A type is preferred: stable, low leverage, low valuation, and solvent.",
+        )
+    return EquityProfileGuidance(
+        primary_profile_code="wait",
+        primary_profile_label="Wait / no preferred equity profile",
+        same_sector_peer_compare_required=True,
+        note="Signals are unresolved. Wait for a cleaner macro regime before preferring a stock profile.",
+    )
+
+
 def compute_regime(
     cb: ChessboardResult,
     stag: StagflationResult,
@@ -192,6 +259,7 @@ def compute_regime(
     tactical_state = _derive_tactical_state(cb, stag, val, stress, policy_optionality)
     legacy_regime_label = _legacy_label(tactical_state, cb, stag, val, stress)
     exposure_guidance = _derive_exposure_guidance(cb)
+    equity_profile_guidance = _derive_equity_profile_guidance(cb)
 
     # ── Secondary overlays ───────────────────────────────────────────────────
     overlays: list[str] = []
@@ -247,6 +315,7 @@ def compute_regime(
         confidence=confidence,
         current_posture=posture,
         exposure_guidance=exposure_guidance,
+        equity_profile_guidance=equity_profile_guidance,
     )
 
 
