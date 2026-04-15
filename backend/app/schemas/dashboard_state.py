@@ -216,6 +216,22 @@ class ExitDisciplineSignal(BaseModel):
     note: str | None = None
 
 
+class CohortRotationItem(BaseModel):
+    cohort_code: str
+    label: str
+    stance: str = "neutral"  # overweight | accumulate_slowly | neutral | underweight | avoid
+    reason: str | None = None
+    forward_pe: float | None = None
+    signal_mode: SignalMode = "directional_only"
+
+
+class CohortRotationGuidance(BaseModel):
+    favored_cohort_codes: list[str] = Field(default_factory=list)
+    defensive_anchor_code: str | None = None
+    items: list[CohortRotationItem] = Field(default_factory=list)
+    note: str | None = None
+
+
 class ReasonedText(BaseModel):
     code: str
     text: str
@@ -253,6 +269,7 @@ class DashboardState(BaseModel):
     exposure_guidance: ExposureGuidance | None = None
     equity_profile_guidance: EquityProfileGuidance | None = None
     exit_discipline_signal: ExitDisciplineSignal | None = None
+    cohort_rotation_guidance: CohortRotationGuidance | None = None
     top_watchpoints: list[str] = Field(default_factory=list)
     top_watchpoint_details: list[ReasonedText] = Field(default_factory=list)
     what_changed: list[str] = Field(default_factory=list)

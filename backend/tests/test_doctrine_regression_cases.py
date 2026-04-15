@@ -322,6 +322,75 @@ def test_a_regime_exit_signal_appears_when_liquidity_support_stops_confirming() 
     assert conclusion is not None
 
 
+def test_early_april_transition_now_consumes_cohort_valuations_in_rotation_guidance() -> None:
+    snapshot = make_snapshot(
+        as_of="2025-04-10T00:00:00Z",
+        fed_funds_rate=4.50,
+        rate_direction_medium_term="tightening",
+        rate_impulse_short="stable",
+        balance_sheet_direction_medium_term="contracting",
+        balance_sheet_pace="contracting_slower",
+        forward_pe=23.0,
+        current_year_forward_pe=23.0,
+        next_year_forward_pe=21.0,
+        selected_year=2025,
+        signal_mode="actionable",
+        coverage_count=7,
+        coverage_ratio=1.0,
+        basis_confidence=1.0,
+        core_cpi_yoy=2.8,
+        unemployment_rate=4.7,
+        fed_put=False,
+    )
+
+    snapshot.inflation.headline_cpi_yoy = 2.5
+    snapshot.inflation.services_ex_energy_status = "cooling"
+    snapshot.inflation.shelter_status = "cooling"
+    snapshot.growth.pmi_services = 49.0
+    snapshot.growth.payrolls_trend = "down"
+    snapshot.growth.unemployment_trend = "up"
+    snapshot.growth.initial_claims_trend = "up"
+    snapshot.valuation.cohort_valuations = [
+        {
+            "cohort_code": "mag7",
+            "label": "Mag 7",
+            "forward_pe": 23.0,
+            "current_year_forward_pe": 23.0,
+            "next_year_forward_pe": 21.0,
+            "selected_year": 2025,
+            "horizon_label": "speaker_fye_proximity_current_year",
+            "signal_mode": "actionable",
+            "coverage_count": 7,
+            "coverage_ratio": 1.0,
+            "basis_confidence": 1.0,
+            "tickers": ["AAPL", "MSFT", "NVDA"],
+        },
+        {
+            "cohort_code": "non_ai_low_valuation_defensive",
+            "label": "Defensive",
+            "forward_pe": 18.0,
+            "current_year_forward_pe": 18.0,
+            "next_year_forward_pe": 17.0,
+            "selected_year": 2025,
+            "horizon_label": "speaker_fye_proximity_current_year",
+            "signal_mode": "actionable",
+            "coverage_count": 2,
+            "coverage_ratio": 1.0,
+            "basis_confidence": 1.0,
+            "tickers": ["BMY", "PFE"],
+        },
+    ]
+
+    state, conclusion = build_dashboard_state_with_conclusion(snapshot)
+
+    assert state.cohort_rotation_guidance is not None
+    item_map = {item.cohort_code: item for item in state.cohort_rotation_guidance.items}
+    assert item_map["mag7"].stance == "accumulate_slowly"
+    assert state.primary_regime.startswith("Quadrant D")
+    assert conclusion is not None
+    assert conclusion.new_cash_action == "accumulate_selectively"
+
+
 def test_after_actual_rate_path_turns_down_regime_becomes_c() -> None:
     snapshot = make_snapshot(
         as_of="2025-09-01T00:00:00Z",

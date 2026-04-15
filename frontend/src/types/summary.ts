@@ -232,6 +232,22 @@ export interface ExitDisciplineSignal {
   note?: string | null
 }
 
+export interface CohortRotationItem {
+  cohort_code?: string
+  label?: string
+  stance?: string
+  reason?: string | null
+  forward_pe?: number
+  signal_mode?: string
+}
+
+export interface CohortRotationGuidance {
+  favored_cohort_codes?: string[]
+  defensive_anchor_code?: string | null
+  items?: CohortRotationItem[]
+  note?: string | null
+}
+
 export interface DashboardState {
   as_of?: string
   data_freshness: DataFreshness
@@ -262,6 +278,7 @@ export interface DashboardState {
   exposure_guidance?: ExposureGuidance
   equity_profile_guidance?: EquityProfileGuidance
   exit_discipline_signal?: ExitDisciplineSignal
+  cohort_rotation_guidance?: CohortRotationGuidance
   top_watchpoints: string[]
   top_watchpoint_details?: Array<{ code: string; text: string }>
   what_changed: string[]
