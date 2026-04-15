@@ -92,9 +92,11 @@ def compute_stress(s: SystemicStressInput) -> StressResult:
         card_zone = "Warning"
 
     src = s.equity_m2_ratio_source
-    mcm2 = s.corporate_equities_m2_ratio or s.market_cap_m2_ratio
-    mcm2_zone = _mcm2_zones(mcm2, src)
-    proxy_warning_active = mcm2_zone in {"Warning", "Extreme"}
+    active_mcm2 = s.market_cap_m2_ratio
+    active_mcm2_zone = _mcm2_zones(active_mcm2, src)
+    z1_mcm2 = s.corporate_equities_m2_ratio
+    z1_mcm2_zone = _mcm2_zones(z1_mcm2, s.corporate_equities_m2_source)
+    proxy_warning_active = src == "spy_fallback"
 
     stress_warning_active = any([
         inverted,
@@ -116,13 +118,19 @@ def compute_stress(s: SystemicStressInput) -> StressResult:
             cre_delinquency_zone=cre_zone,
             credit_card_chargeoff_rate=card,
             credit_card_chargeoff_zone=card_zone,
-            market_cap_m2_ratio=mcm2,
-            market_cap_m2_zone=mcm2_zone,
-            corporate_equities_m2_ratio=mcm2,
-            corporate_equities_m2_zone=mcm2_zone,
+            market_cap_m2_ratio=active_mcm2,
+            market_cap_m2_zone=active_mcm2_zone,
+            speaker_market_cap_m2_ratio=s.speaker_market_cap_m2_ratio,
+            speaker_market_cap_m2_source=s.speaker_market_cap_m2_source,
+            corporate_equities_m2_ratio=z1_mcm2,
+            corporate_equities_m2_zone=z1_mcm2_zone,
+            corporate_equities_m2_source=s.corporate_equities_m2_source,
+            spy_fallback_equity_m2_ratio=s.spy_fallback_equity_m2_ratio,
             equity_m2_ratio_source=src,
             equity_m2_numerator_as_of=s.equity_m2_numerator_as_of,
             equity_m2_numerator_freshness=s.equity_m2_numerator_freshness,
+            corporate_equities_m2_numerator_as_of=s.corporate_equities_m2_numerator_as_of,
+            corporate_equities_m2_numerator_freshness=s.corporate_equities_m2_numerator_freshness,
             proxy_warning_active=proxy_warning_active,
         ),
         stress_warning_active=stress_warning_active,

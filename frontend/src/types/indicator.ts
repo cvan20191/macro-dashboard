@@ -75,11 +75,19 @@ export interface ValuationInput {
 export interface SystemicStressInput {
   yield_curve_10y_2y?: number
   npl_ratio?: number
+  cre_delinquency_rate?: number
   credit_card_chargeoff_rate?: number
   market_cap_m2_ratio?: number
+  speaker_market_cap_m2_ratio?: number
+  speaker_market_cap_m2_source?: string
+  corporate_equities_m2_ratio?: number
+  corporate_equities_m2_source?: string
+  spy_fallback_equity_m2_ratio?: number
   equity_m2_ratio_source?: string
   equity_m2_numerator_as_of?: string
   equity_m2_numerator_freshness?: string
+  corporate_equities_m2_numerator_as_of?: string
+  corporate_equities_m2_numerator_freshness?: string
 }
 
 export interface DollarContextInput {

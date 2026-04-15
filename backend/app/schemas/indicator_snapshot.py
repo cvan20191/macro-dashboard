@@ -103,12 +103,22 @@ class SystemicStressInput(BaseModel):
     npl_ratio: float | None = None
     cre_delinquency_rate: float | None = None
     credit_card_chargeoff_rate: float | None = None
-    # Z.1 corporate equities market value (billions) / WM2NS (billions); SPY heuristic only if Z.1+manual missing.
+    # Active doctrine-facing ratio (manual speaker proxy > Z.1 > SPY fallback).
     market_cap_m2_ratio: float | None = None
-    corporate_equities_m2_ratio: float | None = None
-    # fred_z1 | manual_override | spy_fallback — drives zone thresholds in stress.py
+    # Active ratio source: fred_z1 | manual_override | spy_fallback
     equity_m2_ratio_source: str | None = None
+
+    # Manual speaker-style proxy only.
+    speaker_market_cap_m2_ratio: float | None = None
+    speaker_market_cap_m2_source: str | None = None
+
+    # Z.1 corporate equities market value (billions) / WM2NS (billions) only.
+    corporate_equities_m2_ratio: float | None = None
     corporate_equities_m2_source: str | None = None
+
+    # Explicit SPY fallback path.
+    spy_fallback_equity_m2_ratio: float | None = None
+
     # Observation / override date for the equity numerator (Z.1 observed_at, manual as_of, or SPY quote date)
     equity_m2_numerator_as_of: str | None = None
     corporate_equities_m2_numerator_as_of: str | None = None

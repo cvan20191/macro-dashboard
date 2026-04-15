@@ -127,12 +127,18 @@ class SystemicStress(BaseModel):
     credit_card_chargeoff_zone: str | None = None
     market_cap_m2_ratio: float | None = None
     market_cap_m2_zone: str | None = None
+    speaker_market_cap_m2_ratio: float | None = None
+    speaker_market_cap_m2_source: str | None = None
     corporate_equities_m2_ratio: float | None = None
     corporate_equities_m2_zone: str | None = None
+    corporate_equities_m2_source: str | None = None
+    spy_fallback_equity_m2_ratio: float | None = None
     # How market_cap_m2_ratio was built (for copy / threshold interpretation)
     equity_m2_ratio_source: str | None = None
     equity_m2_numerator_as_of: str | None = None
     equity_m2_numerator_freshness: str | None = None
+    corporate_equities_m2_numerator_as_of: str | None = None
+    corporate_equities_m2_numerator_freshness: str | None = None
     proxy_warning_active: bool = False
 
 

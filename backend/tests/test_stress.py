@@ -21,10 +21,13 @@ def test_equity_m2_zones_fred_z1_scale(ratio: float, zone: str) -> None:
     r = compute_stress(
         SystemicStressInput(
             market_cap_m2_ratio=ratio,
+            corporate_equities_m2_ratio=ratio,
             equity_m2_ratio_source="fred_z1",
+            corporate_equities_m2_source="fred_z1",
         )
     )
     assert r.stress.market_cap_m2_zone == zone
+    assert r.stress.corporate_equities_m2_zone == zone
 
 
 @pytest.mark.parametrize(
@@ -41,9 +44,12 @@ def test_equity_m2_zones_spy_fallback_scale(ratio: float, zone: str) -> None:
         SystemicStressInput(
             market_cap_m2_ratio=ratio,
             equity_m2_ratio_source="spy_fallback",
+            spy_fallback_equity_m2_ratio=ratio,
         )
     )
     assert r.stress.market_cap_m2_zone == zone
+    assert r.stress.corporate_equities_m2_zone is None
+    assert r.stress.proxy_warning_active is True
 
 
 @pytest.mark.parametrize(

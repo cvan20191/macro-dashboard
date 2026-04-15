@@ -142,14 +142,20 @@ export interface SystemicStress {
   credit_card_chargeoff_zone?: string
   market_cap_m2_ratio?: number
   market_cap_m2_zone?: string
+  speaker_market_cap_m2_ratio?: number
+  speaker_market_cap_m2_source?: string
   corporate_equities_m2_ratio?: number
   corporate_equities_m2_zone?: string
+  corporate_equities_m2_source?: string
+  spy_fallback_equity_m2_ratio?: number
   /** fred_z1 | manual_override | spy_fallback */
   equity_m2_ratio_source?: string
   /** Z.1 observed_at, manual JSON as_of, or SPY quote date */
   equity_m2_numerator_as_of?: string
   /** fresh | stale | manual | historical | … from live/replay freshness */
   equity_m2_numerator_freshness?: string
+  corporate_equities_m2_numerator_as_of?: string
+  corporate_equities_m2_numerator_freshness?: string
   proxy_warning_active?: boolean
 }
 

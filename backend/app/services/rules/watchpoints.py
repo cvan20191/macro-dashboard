@@ -96,17 +96,19 @@ def compute_watchpoint_details(
         elif stress.stress.credit_card_chargeoff_zone == "Caution":
             candidates.append((52, "credit_card_stress_caution", f"Credit card charge-off rate at {cc:.2f}% — watch consumer credit"))
 
-    # ── Z.1 equities / M2 (or legacy SPY proxy) ─────────────────────────────
-    mcm2 = stress.stress.corporate_equities_m2_ratio
+    # ── Active equity / M2 view ──────────────────────────────────────────────
+    mcm2 = stress.stress.market_cap_m2_ratio
     if mcm2 is not None:
-        label = (
-            "Corporate equities/M2 proxy (Z.1)"
-            if stress.stress.equity_m2_ratio_source != "spy_fallback"
-            else "Corporate equities/M2 proxy (SPY fallback)"
-        )
-        if stress.stress.corporate_equities_m2_zone == "Extreme":
+        source = stress.stress.equity_m2_ratio_source
+        if source == "manual_override":
+            label = "Speaker market-cap/M2 proxy (manual override)"
+        elif source == "spy_fallback":
+            label = "Equity/M2 proxy (SPY fallback)"
+        else:
+            label = "Corporate equities/M2 proxy (Z.1)"
+        if stress.stress.market_cap_m2_zone == "Extreme":
             candidates.append((88, "corporate_equities_m2_extreme", f"{label} at {mcm2:.2f} — in extreme froth territory"))
-        elif stress.stress.corporate_equities_m2_zone == "Warning":
+        elif stress.stress.market_cap_m2_zone == "Warning":
             candidates.append((65, "corporate_equities_m2_warning", f"{label} at {mcm2:.2f} — above the proxy warning level"))
 
     # ── Yield Curve ──────────────────────────────────────────────────────────

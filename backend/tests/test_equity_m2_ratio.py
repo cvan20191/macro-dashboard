@@ -7,7 +7,11 @@ import json
 import pytest
 
 from app.services.ingestion import normalizer
-from app.services.ingestion.normalizer import build_indicator_snapshot, equity_m2_ratio_core
+from app.services.ingestion.normalizer import (
+    build_indicator_snapshot,
+    compute_equity_m2_views,
+    equity_m2_ratio_core,
+)
 from app.services.providers.base import FetchResult
 
 
@@ -93,8 +97,14 @@ def test_build_snapshot_manual_file_precedence(tmp_path, monkeypatch: pytest.Mon
     ss = snap.systemic_stress
     assert ss.equity_m2_ratio_source == "manual_override"
     assert ss.market_cap_m2_ratio == 6.0
+    assert ss.speaker_market_cap_m2_ratio == 6.0
+    assert ss.speaker_market_cap_m2_source == "manual_override"
+    assert ss.corporate_equities_m2_ratio == round((999_999_999.0 / 1000.0) / 10_000.0, 3)
+    assert ss.corporate_equities_m2_source == "fred_z1"
     assert ss.equity_m2_numerator_as_of == "2025-12-31"
     assert ss.equity_m2_numerator_freshness == "manual"
+    assert ss.corporate_equities_m2_numerator_as_of == "2025-09-30"
+    assert ss.corporate_equities_m2_numerator_freshness == "stale"
 
 
 def test_build_snapshot_z1_metadata_uses_fred_freshness(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -116,5 +126,26 @@ def test_build_snapshot_z1_metadata_uses_fred_freshness(tmp_path, monkeypatch: p
     snap = build_indicator_snapshot(raw, freshness, [], "fresh")
     ss = snap.systemic_stress
     assert ss.equity_m2_ratio_source == "fred_z1"
+    assert ss.market_cap_m2_ratio == ss.corporate_equities_m2_ratio
+    assert ss.corporate_equities_m2_source == "fred_z1"
+    assert ss.speaker_market_cap_m2_ratio is None
     assert ss.equity_m2_numerator_as_of == "2025-10-01"
     assert ss.equity_m2_numerator_freshness == "stale"
+    assert ss.corporate_equities_m2_numerator_as_of == "2025-10-01"
+    assert ss.corporate_equities_m2_numerator_freshness == "stale"
+
+
+def test_compute_equity_m2_views_returns_separated_paths() -> None:
+    views = compute_equity_m2_views(
+        manual_billions=45_000.0,
+        z1_millions=5_400_000.0,
+        m2_billions=20_000.0,
+        sp500_price=600.0,
+    )
+
+    assert views["speaker_ratio"] == 2.25
+    assert views["speaker_source"] == "manual_override"
+    assert views["z1_ratio"] == 0.27
+    assert views["spy_ratio"] is not None
+    assert views["active_ratio"] == 2.25
+    assert views["active_source"] == "manual_override"

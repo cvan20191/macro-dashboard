@@ -246,6 +246,15 @@ def _compute_market_cap_m2(sp500_price: float | None, m2: float | None) -> float
     return round(total_us_equity_billions / m2, 3)
 
 
+def _ratio_from_billions(
+    numerator_billions: float | None,
+    m2_billions: float | None,
+) -> float | None:
+    if numerator_billions is None or m2_billions is None or m2_billions == 0:
+        return None
+    return round(numerator_billions / m2_billions, 3)
+
+
 _MANUAL_EQUITY_M2_PATH = Path(__file__).resolve().parents[2] / "data" / "manual_equity_m2_numerator.json"
 
 
@@ -300,25 +309,68 @@ def equity_m2_ratio_core(
     m2_billions: float | None,
     sp500_price: float | None,
 ) -> tuple[float | None, str | None]:
-    """
-    Pure equity/M2 ratio: manual (billions) > Z.1 (FRED millions → billions) > SPY heuristic.
+    views = compute_equity_m2_views(
+        manual_billions=manual_billions,
+        z1_millions=z1_millions,
+        m2_billions=m2_billions,
+        sp500_price=sp500_price,
+    )
+    return views["active_ratio"], views["active_source"]
 
-    Denominator: WM2NS in billions USD. Exposed for unit tests.
+
+def compute_equity_m2_views(
+    manual_billions: float | None,
+    z1_millions: float | None,
+    m2_billions: float | None,
+    sp500_price: float | None,
+) -> dict[str, float | str | None]:
+    """
+    Separate active, speaker-style, Z.1, and SPY-fallback equity/M2 paths.
+
+    active_ratio follows existing precedence:
+    manual override > Z.1 corporate equities > SPY fallback proxy.
     """
     if m2_billions is None or m2_billions == 0:
-        return None, None
+        return {
+            "active_ratio": None,
+            "active_source": None,
+            "speaker_ratio": None,
+            "speaker_source": None,
+            "z1_ratio": None,
+            "z1_source": None,
+            "spy_ratio": None,
+            "spy_source": None,
+        }
 
-    if manual_billions is not None and manual_billions > 0:
-        return round(manual_billions / m2_billions, 3), "manual_override"
-
+    speaker_ratio = _ratio_from_billions(manual_billions, m2_billions)
+    z1_ratio = None
     if z1_millions is not None:
-        equity_billions = z1_millions / 1000.0
-        return round(equity_billions / m2_billions, 3), "fred_z1"
-
+        z1_ratio = _ratio_from_billions(z1_millions / 1000.0, m2_billions)
     spy_ratio = _compute_market_cap_m2(sp500_price, m2_billions)
-    if spy_ratio is not None:
-        return spy_ratio, "spy_fallback"
-    return None, None
+
+    if speaker_ratio is not None:
+        active_ratio = speaker_ratio
+        active_source = "manual_override"
+    elif z1_ratio is not None:
+        active_ratio = z1_ratio
+        active_source = "fred_z1"
+    elif spy_ratio is not None:
+        active_ratio = spy_ratio
+        active_source = "spy_fallback"
+    else:
+        active_ratio = None
+        active_source = None
+
+    return {
+        "active_ratio": active_ratio,
+        "active_source": active_source,
+        "speaker_ratio": speaker_ratio,
+        "speaker_source": "manual_override" if speaker_ratio is not None else None,
+        "z1_ratio": z1_ratio,
+        "z1_source": "fred_z1" if z1_ratio is not None else None,
+        "spy_ratio": spy_ratio,
+        "spy_source": "spy_fallback" if spy_ratio is not None else None,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -490,7 +542,19 @@ def build_indicator_snapshot(
     sp500_val = get_val("sp500_etf")
     z1_millions = get_val("equity_market_value_z1")
     manual_b, manual_as_of = _parse_manual_equity_m2_file()
-    market_cap_m2, equity_m2_src = equity_m2_ratio_core(manual_b, z1_millions, m2_val, sp500_val)
+    equity_views = compute_equity_m2_views(
+        manual_billions=manual_b,
+        z1_millions=z1_millions,
+        m2_billions=m2_val,
+        sp500_price=sp500_val,
+    )
+    market_cap_m2 = equity_views["active_ratio"]
+    equity_m2_src = equity_views["active_source"]
+    speaker_market_cap_m2 = equity_views["speaker_ratio"]
+    speaker_market_cap_m2_src = equity_views["speaker_source"]
+    z1_equities_m2 = equity_views["z1_ratio"]
+    z1_equities_m2_src = equity_views["z1_source"]
+    spy_fallback_equity_m2 = equity_views["spy_ratio"]
 
     z1_res = raw.get("equity_market_value_z1")
     sp_res = raw.get("sp500_etf")
@@ -512,13 +576,20 @@ def build_indicator_snapshot(
         cre_delinquency_rate=get_val("cre_delinquency"),
         credit_card_chargeoff_rate=get_val("credit_card_chargeoff"),
         market_cap_m2_ratio=market_cap_m2,
-        corporate_equities_m2_ratio=market_cap_m2,
         equity_m2_ratio_source=equity_m2_src,
-        corporate_equities_m2_source=equity_m2_src,
+        speaker_market_cap_m2_ratio=speaker_market_cap_m2,
+        speaker_market_cap_m2_source=speaker_market_cap_m2_src,
+        corporate_equities_m2_ratio=z1_equities_m2,
+        corporate_equities_m2_source=z1_equities_m2_src,
+        spy_fallback_equity_m2_ratio=spy_fallback_equity_m2,
         equity_m2_numerator_as_of=num_as_of,
-        corporate_equities_m2_numerator_as_of=num_as_of,
         equity_m2_numerator_freshness=num_fresh,
-        corporate_equities_m2_numerator_freshness=num_fresh,
+        corporate_equities_m2_numerator_as_of=(
+            z1_res.observed_at if z1_equities_m2 is not None and z1_res is not None else None
+        ),
+        corporate_equities_m2_numerator_freshness=(
+            freshness_statuses.get("equity_market_value_z1") if z1_equities_m2 is not None else None
+        ),
     )
 
     # ------------------------------------------------------------------

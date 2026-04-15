@@ -149,7 +149,10 @@ export function SystemicStressCard({ stress, sources }: Props) {
   const mcm2 = stress.market_cap_m2_ratio ?? null
   const mcm2Zone = stress.market_cap_m2_zone ?? 'Normal'
   const mcm2Color = mcm2Zone === 'Normal' ? 'var(--green)' : mcm2Zone === 'Warning' ? 'var(--yellow)' : 'var(--red)'
-  const z1Scale = stress.equity_m2_ratio_source !== 'spy_fallback'
+  const src = stress.equity_m2_ratio_source
+  const isSpyFallback = src === 'spy_fallback'
+  const isManualOverride = src === 'manual_override'
+  const z1Scale = !isSpyFallback
   const mcm2Segments = z1Scale
     ? [
         { label: 'Normal (<5.8)', color: 'var(--green)', active: mcm2Zone === 'Normal' },
@@ -162,10 +165,16 @@ export function SystemicStressCard({ stress, sources }: Props) {
         { label: 'Extreme (≥3)', color: 'var(--red)', active: mcm2Zone === 'Extreme' },
       ]
 
-  const equityM2Title = z1Scale ? 'Z.1 corporate equities / M2' : 'Equity / M2 (SPY proxy)'
-  const equityM2Note = z1Scale
-    ? 'Numerator: Fed Z.1 market value of corporate equities (L.223, quarterly, millions→billions). Denominator: WM2NS M2 (weekly, billions). Mixing quarterly stock with weekly money is intentional but stale vs spot markets — use as a slow liquidity-absorption gauge, not timing.'
-    : 'Legacy SPY-scaled proxy when Z.1 is unavailable — not comparable to Z.1/M2 levels above.'
+  const equityM2Title = isSpyFallback
+    ? 'Equity / M2 (SPY proxy)'
+    : isManualOverride
+      ? 'Speaker market-cap / M2 (manual override)'
+      : 'Z.1 corporate equities / M2'
+  const equityM2Note = isSpyFallback
+    ? 'Legacy SPY-scaled proxy when Z.1 is unavailable — not comparable to Z.1/M2 levels above.'
+    : isManualOverride
+      ? 'Manual speaker-style market-cap / M2 override. Use as a doctrine-facing proxy only when you explicitly trust the override source.'
+      : 'Numerator: Fed Z.1 market value of corporate equities (L.223, quarterly, millions→billions). Denominator: WM2NS M2 (weekly, billions). Mixing quarterly stock with weekly money is intentional but stale vs spot markets — use as a slow liquidity-absorption gauge, not timing.'
 
   return (
     <Card title="Systemic Stress Gauges">
