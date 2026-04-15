@@ -19,6 +19,8 @@ class DataFreshnessInput(BaseModel):
 
 class LiquidityInput(BaseModel):
     fed_funds_rate: float | None = None
+    # Legacy compatibility fields — retained for debug / backward compatibility,
+    # but no longer doctrine-facing.
     rate_trend_1m: str | None = None       # "up" | "down" | "flat"
     rate_trend_3m: str | None = None
     balance_sheet_assets: float | None = None
@@ -29,6 +31,12 @@ class LiquidityInput(BaseModel):
     # Computed by normalizer from trailing 36-month rate history.
     # None when insufficient history is available.
     rate_cycle_position: float | None = None
+    # Doctrine-facing quadrant inputs.
+    rate_direction_medium_term: str | None = None
+    rate_impulse_short: str | None = None
+    balance_sheet_direction_medium_term: str | None = None
+    balance_sheet_pace: str | None = None
+    quadrant_basis_note: str | None = None
 
 
 class PlumbingInput(BaseModel):

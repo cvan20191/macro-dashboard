@@ -36,8 +36,10 @@ def test_one_month_noise_does_not_create_new_quadrant_by_itself() -> None:
 
     result = compute_chessboard(liq)
 
-    assert result.quadrant == "Unknown"
-    assert result.chessboard.rate_impulse == "mixed"
+    assert result.quadrant == "C"
+    assert result.chessboard.rate_direction_medium_term == "easing"
+    assert result.chessboard.rate_impulse_short == "mixed"
+    assert result.chessboard.balance_sheet_direction_medium_term == "contracting"
 
 
 def test_contracting_but_slowing_qt_stays_c_not_expanding() -> None:

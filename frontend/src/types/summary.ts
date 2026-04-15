@@ -34,17 +34,22 @@ export interface DataFreshness {
 export interface FedChessboard {
   quadrant?: string
   label?: string
+  // Legacy/debug.
   rate_trend_1m?: string
   rate_trend_3m?: string
   balance_sheet_trend_1m?: string
   balance_sheet_trend_3m?: string
   direction_vs_1m_ago?: string
-  // Two-layer chessboard fields — policy stance refactor
-  policy_stance?: string          // "easy" | "middle" | "restrictive"
-  rate_impulse?: string           // "easing" | "stable" | "tightening"
-  balance_sheet_direction?: string // "expanding" | "flat_or_mixed" | "contracting"
+  policy_stance?: string
+  rate_impulse?: string
+  balance_sheet_direction?: string
   balance_sheet_pace?: string
-  transition_tag?: string         // "Improving" | "Stable" | "Deteriorating"
+  transition_tag?: string
+  // Doctrine-facing explanation.
+  rate_direction_medium_term?: string
+  rate_impulse_short?: string
+  balance_sheet_direction_medium_term?: string
+  quadrant_basis_note?: string | null
 }
 
 export interface LiquidityPlumbing {

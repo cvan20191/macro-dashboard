@@ -1,20 +1,4 @@
-"""
-Fed Chessboard — Module 1.
-
-Two-layer model:
-  Layer 1 — Primary Quadrant: A / B / C / D
-            based on directional rate impulse + balance_sheet_direction
-  Layer 2 — Transition Tag: Improving / Stable / Deteriorating
-            based on the same impulse signals, contextualized by quadrant
-
-Speaker-faithful directional meanings:
-  A  rates down + balance sheet up   → MAX LIQUIDITY
-  B  rates up   + balance sheet up   → MIXED LIQUIDITY
-  C  rates down + balance sheet down → TRANSITION / MIXED
-  D  rates up   + balance sheet down → MAX ILLIQUIDITY
-
-Policy stance remains a secondary context signal for downstream overlays/copy.
-"""
+"""Fed Chessboard — quadrant-first, medium-term doctrine model."""
 
 from __future__ import annotations
 
@@ -77,33 +61,40 @@ def _policy_stance(rate: float | None, cycle_pos: float | None) -> str:
         return "restrictive"
     return "middle"
 
-
-def _rate_impulse(liq: LiquidityInput) -> str:
-    """
-    Speaker-faithful timing:
-    - 3m trend defines the regime path
-    - 1m trend only confirms or creates ambiguity
-    - 1m noise must not create a new quadrant by itself
-    """
-    t1 = (liq.rate_trend_1m or "").lower()
+def _legacy_rate_direction_medium_term(liq: LiquidityInput) -> str:
     t3 = (liq.rate_trend_3m or "").lower()
-
     if t3 == "down":
-        return "mixed" if t1 == "up" else "easing"
+        return "easing"
     if t3 == "up":
-        return "mixed" if t1 == "down" else "tightening"
+        return "tightening"
     if t3 == "flat":
         return "stable"
-    return "stable"
+    return "unknown"
 
 
-def _bs_direction(liq: LiquidityInput) -> str:
-    """
-    3m trend defines the medium-term balance-sheet direction.
-    1m does not override it by itself.
-    """
+def _legacy_rate_impulse_short(liq: LiquidityInput, medium_term: str) -> str:
+    t1 = (liq.rate_trend_1m or "").lower()
+    if medium_term == "easing":
+        if t1 == "down":
+            return "confirming_easing"
+        if t1 == "flat":
+            return "stable"
+        if t1 == "up":
+            return "mixed"
+    if medium_term == "tightening":
+        if t1 == "up":
+            return "confirming_tightening"
+        if t1 == "flat":
+            return "stable"
+        if t1 == "down":
+            return "mixed"
+    if medium_term == "stable":
+        return "stable" if t1 == "flat" else "mixed"
+    return "unknown"
+
+
+def _legacy_balance_sheet_direction_medium_term(liq: LiquidityInput) -> str:
     b3 = (liq.balance_sheet_trend_3m or "").lower()
-
     if b3 == "up":
         return "expanding"
     if b3 == "down":
@@ -111,21 +102,18 @@ def _bs_direction(liq: LiquidityInput) -> str:
     return "flat_or_mixed"
 
 
-def _bs_pace(liq: LiquidityInput) -> str:
-    """
-    Distinguish 'still contracting, but slower' from actual expansion.
-    """
+def _legacy_balance_sheet_pace(liq: LiquidityInput, medium_term: str) -> str:
     b1 = (liq.balance_sheet_trend_1m or "").lower()
-    b3 = (liq.balance_sheet_trend_3m or "").lower()
-
-    if b3 == "down":
+    if medium_term == "contracting":
         if b1 in {"flat", "up"}:
             return "contracting_slower"
-        return "contracting_same_or_faster"
-    if b3 == "up":
+        if b1 == "down":
+            return "contracting_same_or_faster"
+    if medium_term == "expanding":
         if b1 in {"flat", "down"}:
             return "expanding_slower"
-        return "expanding_same_or_faster"
+        if b1 == "up":
+            return "expanding_same_or_faster"
     return "flat_or_mixed"
 
 
@@ -138,60 +126,50 @@ class ChessboardResult:
 
 
 def compute_chessboard(liq: LiquidityInput) -> ChessboardResult:
-    """
-    Determine the Fed Chessboard quadrant and transition tag.
-
-    Primary quadrant is directional: rate impulse + balance-sheet direction.
-    Policy stance is retained as secondary context only.
-    """
     stance = _policy_stance(liq.fed_funds_rate, liq.rate_cycle_position)
-    impulse = _rate_impulse(liq)
-    bs_dir = _bs_direction(liq)
-    bs_pace = _bs_pace(liq)
+    rate_direction = liq.rate_direction_medium_term or _legacy_rate_direction_medium_term(liq)
+    rate_impulse_short = liq.rate_impulse_short or _legacy_rate_impulse_short(liq, rate_direction)
+    balance_sheet_direction = (
+        liq.balance_sheet_direction_medium_term
+        or _legacy_balance_sheet_direction_medium_term(liq)
+    )
+    balance_sheet_pace = liq.balance_sheet_pace or _legacy_balance_sheet_pace(liq, balance_sheet_direction)
 
-    # ── Primary Quadrant (strict directional doctrine map) ───────────────────
-    if impulse == "easing" and bs_dir == "expanding":
+    if rate_direction == "easing" and balance_sheet_direction == "expanding":
         quadrant = "A"
         label = "MAX LIQUIDITY"
-    elif impulse == "tightening" and bs_dir == "expanding":
+    elif rate_direction == "tightening" and balance_sheet_direction == "expanding":
         quadrant = "B"
         label = "MIXED LIQUIDITY: BALANCE SHEET SUPPORT"
-    elif impulse == "easing" and bs_dir == "contracting":
+    elif rate_direction == "easing" and balance_sheet_direction == "contracting":
         quadrant = "C"
         label = "TRANSITION TO EASIER MONEY"
-    elif impulse == "tightening" and bs_dir == "contracting":
+    elif rate_direction == "tightening" and balance_sheet_direction == "contracting":
         quadrant = "D"
         label = "MAX ILLIQUIDITY"
     else:
         quadrant = "Unknown"
         label = "AMBIGUOUS / WAIT FOR CLEANER SIGNAL"
 
-    # ── Transition Tag ────────────────────────────────────────────────────────
-    if quadrant == "Unknown":
+    if quadrant == "A":
+        transition_tag = "Improving"
+    elif quadrant == "B":
         transition_tag = "Stable"
-    else:
-        if quadrant == "A":
+    elif quadrant == "C":
+        if balance_sheet_pace == "contracting_slower" or rate_impulse_short == "confirming_easing":
             transition_tag = "Improving"
-        elif quadrant == "B":
+        elif rate_impulse_short == "mixed":
             transition_tag = "Stable"
-        elif quadrant == "C":
-            if bs_pace == "contracting_slower":
-                transition_tag = "Improving"
-            elif impulse == "mixed":
-                transition_tag = "Stable"
-            else:
-                transition_tag = "Stable"
-        elif quadrant == "D":
-            if bs_pace == "contracting_slower" and impulse in {"stable", "mixed"}:
-                transition_tag = "Stable"
-            else:
-                transition_tag = "Deteriorating"
         else:
             transition_tag = "Stable"
+    elif quadrant == "D":
+        if balance_sheet_pace == "contracting_slower" and rate_impulse_short in {"stable", "mixed"}:
+            transition_tag = "Stable"
+        else:
+            transition_tag = "Deteriorating"
+    else:
+        transition_tag = "Stable"
 
-    # ── Downstream compatibility booleans ────────────────────────────────────
-    # Derived from quadrant + transition_tag rather than raw trend strings,
-    # keeping downstream logic aligned with the new two-layer model.
     liquidity_improving = quadrant == "A" or (
         quadrant == "C" and transition_tag == "Improving"
     )
@@ -211,10 +189,19 @@ def compute_chessboard(liq: LiquidityInput) -> ChessboardResult:
         balance_sheet_trend_3m=liq.balance_sheet_trend_3m,
         direction_vs_1m_ago=direction,
         policy_stance=stance,
-        rate_impulse=impulse,
-        balance_sheet_direction=bs_dir,
-        balance_sheet_pace=bs_pace,
+        rate_impulse=rate_impulse_short,
+        balance_sheet_direction=balance_sheet_direction,
+        balance_sheet_pace=balance_sheet_pace,
         transition_tag=transition_tag,
+        rate_direction_medium_term=rate_direction,
+        rate_impulse_short=rate_impulse_short,
+        balance_sheet_direction_medium_term=balance_sheet_direction,
+        quadrant_basis_note=(
+            liq.quadrant_basis_note
+            or "Quadrant uses medium-term Fed rate direction plus medium-term Fed "
+            "balance-sheet direction; short impulse and balance-sheet pace only "
+            "modify transition."
+        ),
     )
 
     return ChessboardResult(

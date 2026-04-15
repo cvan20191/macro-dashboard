@@ -45,6 +45,10 @@ _BALANCE_SHEET_DELTA_THRESHOLD = 25_000.0  # WALCL is in millions USD => 25B thr
 _UNEMPLOYMENT_DELTA_THRESHOLD = 0.05
 _CLAIMS_PCT_THRESHOLD = 0.03
 _PAYROLLS_DELTA_THRESHOLD = 25.0
+_RATE_MEDIUM_TERM_LOOKBACK_DAYS = 91
+_RATE_SHORT_LOOKBACK_DAYS = 28
+_BALANCE_SHEET_MEDIUM_TERM_LOOKBACK_DAYS = 91
+_BALANCE_SHEET_SHORT_LOOKBACK_DAYS = 28
 _PLUMBING_RESERVE_TREND_LOOKBACK_DAYS = 28
 _PLUMBING_RESERVE_BUFFER_LOOKBACK_DAYS = 182
 _PLUMBING_FLOW_TREND_LOOKBACK_DAYS = 28
@@ -126,6 +130,80 @@ def _median_ratio(series: list[tuple[str, float]], lookback_days: int) -> float 
 
 def _rate_trend(series: list[tuple[str, float]], lookback_days: int) -> str:
     return _trend_by_absolute_delta(series, lookback_days, _RATE_BPS_THRESHOLD)
+
+
+def _rate_direction_medium_term(series: list[tuple[str, float]]) -> str:
+    trend = _trend_by_absolute_delta(
+        series,
+        _RATE_MEDIUM_TERM_LOOKBACK_DAYS,
+        _RATE_BPS_THRESHOLD,
+    )
+    if trend == "down":
+        return "easing"
+    if trend == "up":
+        return "tightening"
+    if trend == "flat":
+        return "stable"
+    return "unknown"
+
+
+def _rate_impulse_short(series: list[tuple[str, float]], medium_term: str) -> str:
+    short = _trend_by_absolute_delta(
+        series,
+        _RATE_SHORT_LOOKBACK_DAYS,
+        _RATE_BPS_THRESHOLD,
+    )
+    if short == "unknown":
+        return "unknown"
+    if medium_term == "easing":
+        if short == "down":
+            return "confirming_easing"
+        if short == "flat":
+            return "stable"
+        return "mixed"
+    if medium_term == "tightening":
+        if short == "up":
+            return "confirming_tightening"
+        if short == "flat":
+            return "stable"
+        return "mixed"
+    if medium_term == "stable":
+        return "stable" if short == "flat" else "mixed"
+    return "unknown"
+
+
+def _balance_sheet_direction_medium_term(series: list[tuple[str, float]]) -> str:
+    trend = _trend_by_absolute_delta(
+        series,
+        _BALANCE_SHEET_MEDIUM_TERM_LOOKBACK_DAYS,
+        _BALANCE_SHEET_DELTA_THRESHOLD,
+    )
+    if trend == "up":
+        return "expanding"
+    if trend == "down":
+        return "contracting"
+    return "flat_or_mixed"
+
+
+def _balance_sheet_pace(series: list[tuple[str, float]], medium_term: str) -> str:
+    short = _trend_by_absolute_delta(
+        series,
+        _BALANCE_SHEET_SHORT_LOOKBACK_DAYS,
+        _BALANCE_SHEET_DELTA_THRESHOLD,
+    )
+    if medium_term == "contracting":
+        if short in {"flat", "up"}:
+            return "contracting_slower"
+        if short == "down":
+            return "contracting_same_or_faster"
+        return "flat_or_mixed"
+    if medium_term == "expanding":
+        if short in {"flat", "down"}:
+            return "expanding_slower"
+        if short == "up":
+            return "expanding_same_or_faster"
+        return "flat_or_mixed"
+    return "flat_or_mixed"
 
 
 def _compute_cycle_position(series: list[tuple[str, float]]) -> float | None:
@@ -280,18 +358,36 @@ def build_indicator_snapshot(
 
     # Infer policy put from rate trend if not explicitly provided
     rate_t1m = _rate_trend(rate_series, 21)
+    rate_t3m = _rate_trend(rate_series, 63)
+    bs_t1m = _trend_by_absolute_delta(bs_series, 28, _BALANCE_SHEET_DELTA_THRESHOLD)
+    bs_t3m = _trend_by_absolute_delta(bs_series, 91, _BALANCE_SHEET_DELTA_THRESHOLD)
+    rate_direction_medium_term = _rate_direction_medium_term(rate_series)
+    rate_impulse_short = _rate_impulse_short(rate_series, rate_direction_medium_term)
+    balance_sheet_direction_medium_term = _balance_sheet_direction_medium_term(bs_series)
+    balance_sheet_pace = _balance_sheet_pace(bs_series, balance_sheet_direction_medium_term)
     if not fed_put and rate_t1m == "down":
         fed_put = True
         logger.info("Fed put inferred from falling rate trend")
 
     liquidity = LiquidityInput(
         fed_funds_rate=get_val("fed_funds_rate"),
+        # Legacy compatibility fields.
         rate_trend_1m=rate_t1m,
-        rate_trend_3m=_rate_trend(rate_series, 63),
+        rate_trend_3m=rate_t3m,
         balance_sheet_assets=get_val("balance_sheet"),
-        balance_sheet_trend_1m=_trend_by_absolute_delta(bs_series, 28, _BALANCE_SHEET_DELTA_THRESHOLD),
-        balance_sheet_trend_3m=_trend_by_absolute_delta(bs_series, 91, _BALANCE_SHEET_DELTA_THRESHOLD),
+        balance_sheet_trend_1m=bs_t1m,
+        balance_sheet_trend_3m=bs_t3m,
         rate_cycle_position=_compute_cycle_position(rate_series),
+        # Doctrine-facing fields.
+        rate_direction_medium_term=rate_direction_medium_term,
+        rate_impulse_short=rate_impulse_short,
+        balance_sheet_direction_medium_term=balance_sheet_direction_medium_term,
+        balance_sheet_pace=balance_sheet_pace,
+        quadrant_basis_note=(
+            "Quadrant uses medium-term Fed rate direction plus medium-term Fed "
+            "balance-sheet direction; short impulse and balance-sheet pace only "
+            "modify transition."
+        ),
     )
     plumbing = PlumbingInput(
         total_reserves=get_val("total_reserves"),

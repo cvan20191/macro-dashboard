@@ -13,17 +13,23 @@ class DataFreshness(BaseModel):
 class FedChessboard(BaseModel):
     quadrant: str | None = None
     label: str | None = None
+    # Legacy compatibility fields — retained for debug / backward compatibility.
     rate_trend_1m: str | None = None
     rate_trend_3m: str | None = None
     balance_sheet_trend_1m: str | None = None
     balance_sheet_trend_3m: str | None = None
     direction_vs_1m_ago: str | None = None
-    # Two-layer chessboard fields — added by policy stance refactor
-    policy_stance: str | None = None           # "easy" | "middle" | "restrictive"
-    rate_impulse: str | None = None            # "easing" | "stable" | "tightening" | "mixed"
-    balance_sheet_direction: str | None = None # "expanding" | "flat_or_mixed" | "contracting"
-    balance_sheet_pace: str | None = None      # "contracting_slower" | "contracting_same_or_faster" | ...
-    transition_tag: str | None = None          # "Improving" | "Stable" | "Deteriorating"
+    # Existing surfaced helpers.
+    policy_stance: str | None = None
+    rate_impulse: str | None = None
+    balance_sheet_direction: str | None = None
+    balance_sheet_pace: str | None = None
+    transition_tag: str | None = None
+    # Doctrine-facing explanation fields.
+    rate_direction_medium_term: str | None = None
+    rate_impulse_short: str | None = None
+    balance_sheet_direction_medium_term: str | None = None
+    quadrant_basis_note: str | None = None
 
 
 class LiquidityPlumbing(BaseModel):
