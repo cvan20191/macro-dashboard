@@ -705,7 +705,6 @@ async def get_live_playbook(
         snapshot=snapshot,
         state=state,
         playbook_conclusion=playbook_conclusion,
-        summary=None,
         catalysts=catalysts,
         sources=snapshot_resp.sources,
         overall_status=snapshot_resp.overall_status,

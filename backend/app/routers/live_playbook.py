@@ -61,8 +61,8 @@ async def live_playbook(
     pmi_services: float | None = Query(default=None, description="Optional manual PMI services override"),
 ) -> LivePlaybookResponse:
     """
-    Full live pipeline: providers → IndicatorSnapshot → rule engine → LLM summary.
-    Returns LivePlaybookResponse with snapshot, state, summary, and source metadata.
+    Full live pipeline: providers → IndicatorSnapshot → rule engine → deterministic summary.
+    Returns LivePlaybookResponse with snapshot, state, and source metadata.
     """
     try:
         return await get_live_playbook(

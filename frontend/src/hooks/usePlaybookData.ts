@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import { fetchPlaybook, fetchLivePlaybook, triggerManualRefresh } from '../api/playbook'
 import type { IndicatorSnapshot } from '../types/indicator'
 import type { CatalystState, LivePlaybookResponse } from '../types/playbook'
-import type { DeterministicSummary } from '../types/summary'
+import type { DeterministicSummary, PlaybookSummary } from '../types/summary'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -15,7 +15,7 @@ export interface PlaybookData {
   snapshot?: LivePlaybookResponse['snapshot']
   state: LivePlaybookResponse['state']
   playbook_conclusion?: LivePlaybookResponse['playbook_conclusion']
-  summary: LivePlaybookResponse['summary']
+  summary?: PlaybookSummary | null
   catalysts?: CatalystState
   sources?: LivePlaybookResponse['sources']
   overall_status?: string
@@ -34,7 +34,6 @@ export interface UsePlaybookDataReturn {
   status: LoadStatus
   data: PlaybookData | null
   deterministicSummary: DeterministicSummary | null
-  summary: null
   errorMessage: string
   refreshing: boolean
   showDebug: boolean
@@ -200,7 +199,6 @@ export function usePlaybookData(): UsePlaybookDataReturn {
           snapshot: live.snapshot,
           state: live.state,
           playbook_conclusion: live.playbook_conclusion,
-          summary: live.summary,
           catalysts: live.catalysts,
           sources: live.sources,
           overall_status: live.overall_status,
@@ -277,7 +275,6 @@ export function usePlaybookData(): UsePlaybookDataReturn {
     status,
     data,
     deterministicSummary,
-    summary: null,
     errorMessage,
     refreshing,
     showDebug,

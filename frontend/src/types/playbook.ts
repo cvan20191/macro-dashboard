@@ -141,7 +141,6 @@ export interface LivePlaybookResponse {
   snapshot: IndicatorSnapshot
   state: DashboardState
   playbook_conclusion?: PlaybookConclusion
-  summary: PlaybookSummary | null
   catalysts: CatalystState
   sources: Record<string, SourceMeta>
   overall_status: string

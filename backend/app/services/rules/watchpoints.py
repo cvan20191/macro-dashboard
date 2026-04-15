@@ -56,12 +56,13 @@ def compute_watchpoint_details(
             candidates.append((40, "valuation_buy_zone", f"{_pe_label} at {pe:.1f}x — inside the historical accumulation zone{_proxy_suffix}"))
 
     # ── Fed Balance Sheet ─────────────────────────────────────────────────────
-    bs = cb.chessboard.balance_sheet_trend_1m
-    if bs == "down":
+    bs_pace = cb.chessboard.balance_sheet_pace
+    bs_effective = cb.chessboard.effective_balance_sheet_direction
+    if bs_effective == "contracting" and bs_pace == "contracting_same_or_faster":
         candidates.append((75, "balance_sheet_contracting", "Fed balance sheet is still contracting — net liquidity withdrawal ongoing"))
-    elif bs == "flat":
+    elif bs_pace in {"contracting_slower", "flat_or_mixed"}:
         candidates.append((55, "balance_sheet_flat", "Fed balance sheet is flat — contraction has paused but not reversed"))
-    elif bs == "up":
+    elif bs_effective == "expanding":
         candidates.append((30, "balance_sheet_expanding", "Fed balance sheet is expanding — liquidity is being injected"))
 
     # ── Unemployment ─────────────────────────────────────────────────────────

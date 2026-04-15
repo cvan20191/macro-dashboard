@@ -4,15 +4,16 @@ import { TrendChip } from '../ui/TrendChip'
 
 interface Props { cb: FedChessboard }
 
-/** Honest semantics: trends are last N daily DFEDTARU prints, not calendar-month slopes. */
-const FED_TARGET_SHORT_TITLE =
-  'Recent Fed funds target direction, not a monthly average. Uses the last four daily upper-bound readings (DFEDTARU). On a step-wise target, this mostly flags whether a recent target change falls inside that slice.'
-
-const FED_TARGET_WIDER_TITLE =
-  'Same idea over more daily prints — still not a calendar-month trend. Uses the last twelve daily readings. Between FOMC meetings this usually reads flat unless a change sits inside the window.'
-
 // Grid layout: D=top-left, B=top-right, C=bottom-left, A=bottom-right
 // Axes: horizontal = balance sheet, vertical = rates
+
+function toTrend(value?: string): string | undefined {
+  if (!value) return undefined
+  if (value === 'easing' || value === 'confirming_easing' || value === 'contracting') return 'down'
+  if (value === 'tightening' || value === 'confirming_tightening' || value === 'expanding') return 'up'
+  if (value === 'stable' || value === 'mixed' || value === 'flat_or_mixed') return 'flat'
+  return 'unknown'
+}
 
 export function FedChessboardCard({ cb }: Props) {
   const activeId = cb.quadrant
@@ -76,12 +77,12 @@ export function FedChessboardCard({ cb }: Props) {
         </div>
       </div>
 
-      {/* Trend chips */}
+      {/* Doctrine chips */}
       <div style={s.chips}>
-        <TrendChip label="Fed target — short window" title={FED_TARGET_SHORT_TITLE} trend={cb.rate_trend_1m} />
-        <TrendChip label="Fed target — wider window" title={FED_TARGET_WIDER_TITLE} trend={cb.rate_trend_3m} />
-        <TrendChip label="Balance Sheet 1M" trend={cb.balance_sheet_trend_1m} />
-        <TrendChip label="Balance Sheet 3M" trend={cb.balance_sheet_trend_3m} />
+        <TrendChip label="Rate direction" trend={toTrend(cb.rate_direction_medium_term)} title={cb.rate_direction_medium_term} />
+        <TrendChip label="Rate impulse" trend={toTrend(cb.rate_impulse_short)} title={cb.rate_impulse_short} />
+        <TrendChip label="Raw balance sheet" trend={toTrend(cb.balance_sheet_direction_medium_term)} title={cb.balance_sheet_direction_medium_term} />
+        <TrendChip label="Effective liquidity" trend={toTrend(cb.effective_balance_sheet_direction)} title={cb.effective_balance_sheet_direction} />
       </div>
 
       {/* Active quadrant interpretation */}

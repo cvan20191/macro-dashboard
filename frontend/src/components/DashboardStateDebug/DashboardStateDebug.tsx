@@ -41,8 +41,8 @@ export function DashboardStateDebug({ state, sources, snapshotJson }: Props) {
             value={`Quadrant ${state.fed_chessboard?.quadrant ?? '?'} — ${state.fed_chessboard?.label ?? '—'}`}
           />
           <DebugRow
-            label="Rate / BS trends"
-            value={`Fed target short (4 daily): ${state.fed_chessboard?.rate_trend_1m ?? '—'} | Fed target wider (12 daily): ${state.fed_chessboard?.rate_trend_3m ?? '—'} | BS 1M: ${state.fed_chessboard?.balance_sheet_trend_1m ?? '—'} | BS 3M: ${state.fed_chessboard?.balance_sheet_trend_3m ?? '—'}`}
+            label="Rate / BS doctrine"
+            value={`Rate direction: ${state.fed_chessboard?.rate_direction_medium_term ?? '—'} | Rate impulse: ${state.fed_chessboard?.rate_impulse_short ?? '—'} | Raw BS: ${state.fed_chessboard?.balance_sheet_direction_medium_term ?? '—'} | Effective BS: ${state.fed_chessboard?.effective_balance_sheet_direction ?? '—'}`}
           />
 
           <Divider />

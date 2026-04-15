@@ -216,7 +216,7 @@ def _derive_regime_transition(r: _RuleOutputs) -> RegimeTransition:
         from_regime, to_regime = transition_path.split("_to_", 1)
         reasons = [
             f"transition_path:{transition_path}",
-            f"rate_impulse:{r.cb.chessboard.rate_impulse or 'unknown'}",
+            f"rate_impulse_short:{r.cb.chessboard.rate_impulse_short or 'unknown'}",
             f"balance_sheet_pace:{r.cb.chessboard.balance_sheet_pace or 'unknown'}",
         ]
         return RegimeTransition(
@@ -253,14 +253,14 @@ def _derive_regime_transition(r: _RuleOutputs) -> RegimeTransition:
     if direction in {"improving", "deteriorating"}:
         strength = (
             "strong"
-            if r.cb.chessboard.balance_sheet_direction != "flat_or_mixed"
-            and r.cb.chessboard.rate_impulse not in {None, "stable", "mixed"}
+            if r.cb.chessboard.effective_balance_sheet_direction != "flat_or_mixed"
+            and r.cb.chessboard.rate_impulse_short not in {None, "stable", "mixed"}
             else "moderate"
         )
 
     reasons = [
-        f"rate_impulse:{r.cb.chessboard.rate_impulse or 'unknown'}",
-        f"balance_sheet_direction:{r.cb.chessboard.balance_sheet_direction or 'unknown'}",
+        f"rate_impulse_short:{r.cb.chessboard.rate_impulse_short or 'unknown'}",
+        f"effective_balance_sheet_direction:{r.cb.chessboard.effective_balance_sheet_direction or 'unknown'}",
         f"transition_tag:{r.cb.chessboard.transition_tag or 'unknown'}",
     ]
     return RegimeTransition(

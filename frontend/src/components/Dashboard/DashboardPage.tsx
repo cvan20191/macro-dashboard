@@ -20,8 +20,13 @@ import { DashboardStateDebug } from '../DashboardStateDebug'
 // ---------------------------------------------------------------------------
 
 const DEFAULT_CHESSBOARD: FedChessboard = {
-  quadrant: undefined, label: 'Unknown', rate_trend_1m: undefined,
-  rate_trend_3m: undefined, balance_sheet_trend_1m: undefined, balance_sheet_trend_3m: undefined,
+  quadrant: undefined,
+  label: 'Unknown',
+  rate_direction_medium_term: undefined,
+  rate_impulse_short: undefined,
+  balance_sheet_direction_medium_term: undefined,
+  effective_balance_sheet_direction: undefined,
+  balance_sheet_pace: undefined,
 }
 
 const DEFAULT_TRAP: StagflationTrap = {

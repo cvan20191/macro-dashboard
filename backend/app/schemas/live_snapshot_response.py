@@ -13,7 +13,6 @@ from app.schemas.macro_expectations import MacroExpectationsState
 from app.schemas.playbook_conclusion import PlaybookConclusion
 from app.schemas.playbook_response import PlaybookResponse  # noqa: F401  (re-exported)
 from app.schemas.source_meta import SourceMeta
-from app.schemas.summary import PlaybookSummary
 
 
 class LiveSnapshotResponse(BaseModel):
@@ -28,7 +27,6 @@ class LivePlaybookResponse(BaseModel):
     snapshot: IndicatorSnapshot
     state: DashboardState
     playbook_conclusion: PlaybookConclusion | None = None
-    summary: PlaybookSummary | None = None
     catalysts: CatalystState = Field(default_factory=CatalystState)
     sources: dict[str, SourceMeta]
     overall_status: str

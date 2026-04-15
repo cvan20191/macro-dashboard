@@ -13,24 +13,13 @@ class DataFreshness(BaseModel):
 class FedChessboard(BaseModel):
     quadrant: str | None = None
     label: str | None = None
-    # Legacy compatibility fields — retained for debug / backward compatibility.
-    rate_trend_1m: str | None = None
-    rate_trend_3m: str | None = None
-    balance_sheet_trend_1m: str | None = None
-    balance_sheet_trend_3m: str | None = None
-    direction_vs_1m_ago: str | None = None
-    # Existing surfaced helpers.
-    # Debug-only compatibility field; live doctrine output should leave this unset.
-    policy_stance: str | None = None
-    rate_impulse: str | None = None
-    balance_sheet_direction: str | None = None
-    balance_sheet_pace: str | None = None
-    # Doctrine-facing explanation fields.
+    # Doctrine-facing explanation fields only.
     rate_direction_medium_term: str | None = None
     rate_impulse_short: str | None = None
     balance_sheet_direction_medium_term: str | None = None
     effective_balance_sheet_direction: str | None = None
     balance_sheet_liquidity_interpretation: str | None = None
+    balance_sheet_pace: str | None = None
     liquidity_transition_path: str | None = None
     transition_tag: str | None = None
     quadrant_basis_note: str | None = None

@@ -56,6 +56,6 @@ def test_contracting_but_slowing_qt_stays_c_not_expanding() -> None:
     result = compute_chessboard(liq)
 
     assert result.quadrant == "C"
-    assert result.chessboard.balance_sheet_direction == "contracting"
+    assert result.chessboard.effective_balance_sheet_direction == "contracting"
     assert result.chessboard.balance_sheet_pace == "contracting_slower"
     assert result.chessboard.transition_tag == "Improving"

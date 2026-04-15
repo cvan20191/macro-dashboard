@@ -34,7 +34,6 @@ def test_actual_c_after_policy_path_turns_easing() -> None:
     assert result.quadrant == "C"
     assert result.chessboard.liquidity_transition_path == "none"
     assert result.chessboard.transition_tag == "Improving"
-    assert result.chessboard.policy_stance is None
 
 
 def test_qt_slowing_never_counts_as_expansion() -> None:

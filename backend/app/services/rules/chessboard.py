@@ -160,26 +160,15 @@ def compute_chessboard(
     liquidity_improving = quadrant in {"A", "C"} or liquidity_transition_path == "D_to_C"
     liquidity_tight = quadrant == "D" and liquidity_transition_path != "D_to_C"
 
-    # ── Direction field (preserved for existing consumers) ───────────────────
-    direction = _derive_direction(liq)
-
     cb = FedChessboard(
         quadrant=quadrant,
         label=label,
-        rate_trend_1m=liq.rate_trend_1m,
-        rate_trend_3m=liq.rate_trend_3m,
-        balance_sheet_trend_1m=liq.balance_sheet_trend_1m,
-        balance_sheet_trend_3m=liq.balance_sheet_trend_3m,
-        direction_vs_1m_ago=direction,
-        policy_stance=None,
-        rate_impulse=rate_impulse_short,
-        balance_sheet_direction=effective_balance_sheet_direction,
-        balance_sheet_pace=balance_sheet_pace,
         rate_direction_medium_term=rate_direction,
         rate_impulse_short=rate_impulse_short,
         balance_sheet_direction_medium_term=raw_balance_sheet_direction,
         effective_balance_sheet_direction=effective_balance_sheet_direction,
         balance_sheet_liquidity_interpretation=balance_sheet_liquidity_interpretation,
+        balance_sheet_pace=balance_sheet_pace,
         liquidity_transition_path=liquidity_transition_path,
         transition_tag=transition_tag,
         quadrant_basis_note=(
@@ -196,27 +185,3 @@ def compute_chessboard(
         liquidity_tight=liquidity_tight,
         quadrant=quadrant,
     )
-
-
-def _derive_direction(liq: LiquidityInput) -> str | None:
-    """
-    Compare 1m vs 3m trends to determine if conditions are improving or
-    deteriorating vs a month ago. Preserved for existing consumers.
-    """
-    r1, r3 = liq.rate_trend_1m, liq.rate_trend_3m
-    b1, b3 = liq.balance_sheet_trend_1m, liq.balance_sheet_trend_3m
-
-    if r1 is None and b1 is None:
-        return None
-
-    rate_improved = (r1 or "").lower() == "down" and (r3 or "").lower() == "up"
-    bs_improved = (b1 or "").lower() == "up" and (b3 or "").lower() in {"down", "flat"}
-
-    rate_worsened = (r1 or "").lower() == "up" and (r3 or "").lower() == "down"
-    bs_worsened = (b1 or "").lower() in {"down", "flat"} and (b3 or "").lower() == "up"
-
-    if rate_improved or bs_improved:
-        return "improving"
-    if rate_worsened or bs_worsened:
-        return "deteriorating"
-    return "stable"

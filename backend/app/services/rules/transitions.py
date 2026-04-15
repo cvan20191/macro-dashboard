@@ -139,10 +139,11 @@ def compute_what_changes_call_details(
         bullets.append(ReasonedText(code="core_services_rollover", text="Core services inflation decisively rolls over toward the 2.5% range"))
 
     # Liquidity trigger
-    bs = cb.chessboard.balance_sheet_trend_1m
-    if bs in {"down", "flat"}:
+    bs_effective = cb.chessboard.effective_balance_sheet_direction
+    bs_pace = cb.chessboard.balance_sheet_pace
+    if bs_effective != "expanding":
         bullets.append(ReasonedText(code="balance_sheet_turns_expansionary", text="Fed balance sheet turns clearly expansionary for multiple consecutive weeks"))
-    elif bs == "up":
+    elif bs_pace == "expanding_slower":
         bullets.append(ReasonedText(code="balance_sheet_expansion_stalls", text="Fed balance sheet expansion reverses or stalls — reducing the liquidity tailwind"))
 
     # Trap / labor trigger
