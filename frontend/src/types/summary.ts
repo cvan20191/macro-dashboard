@@ -254,6 +254,9 @@ export interface PeerScoreMetric {
   peer_median?: number
   favorable_percentile?: number
   signal?: string
+  signal_mode?: string | null
+  hard_actionable?: boolean
+  note?: string | null
 }
 
 export interface ValuationGrowthFit {

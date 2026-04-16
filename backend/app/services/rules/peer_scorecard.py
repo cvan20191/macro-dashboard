@@ -24,6 +24,13 @@ class PeerRaw:
     debt_to_ebitda: float | None
 
 
+@dataclass(frozen=True)
+class _ForwardPERead:
+    value: float | None
+    signal_mode: str
+    note: str | None
+
+
 def _coerce_float(value: Any) -> float | None:
     try:
         if value is None:
@@ -85,7 +92,7 @@ def _metric(
     )
 
 
-def _single_name_forward_pe(raw: PeerRaw, *, as_of: date) -> float | None:
+def _single_name_forward_pe_read(raw: PeerRaw, *, as_of: date) -> _ForwardPERead:
     result = compute_speaker_forward_pe(
         [
             {
@@ -99,7 +106,89 @@ def _single_name_forward_pe(raw: PeerRaw, *, as_of: date) -> float | None:
         ],
         as_of=as_of,
     )
-    return result.speaker_forward_pe
+
+    selected_year_eps = (
+        _coerce_float(raw.annual_eps_by_year.get(result.selected_year))
+        if result.selected_year is not None
+        else None
+    )
+    signal_mode = (
+        "actionable"
+        if (
+            result.speaker_forward_pe is not None
+            and result.horizon_label != "speaker_fye_transition_band"
+            and selected_year_eps is not None
+            and selected_year_eps > 0
+        )
+        else "directional_only"
+    )
+    note = result.note if signal_mode != "actionable" else None
+
+    return _ForwardPERead(
+        value=result.speaker_forward_pe,
+        signal_mode=signal_mode,
+        note=note,
+    )
+
+
+def _forward_pe_metric(
+    *,
+    target_read: _ForwardPERead,
+    peer_reads: list[_ForwardPERead],
+) -> PeerScoreMetric:
+    actionable_peer_values = [
+        read.value
+        for read in peer_reads
+        if read.signal_mode == "actionable" and read.value is not None
+    ]
+    peer_median = round(median(actionable_peer_values), 4) if actionable_peer_values else None
+
+    if target_read.value is None:
+        return PeerScoreMetric(
+            value=None,
+            peer_median=peer_median,
+            favorable_percentile=None,
+            signal="unknown",
+            signal_mode=target_read.signal_mode,
+            hard_actionable=False,
+            note=target_read.note,
+        )
+
+    if target_read.signal_mode != "actionable":
+        return PeerScoreMetric(
+            value=target_read.value,
+            peer_median=peer_median,
+            favorable_percentile=None,
+            signal="unknown",
+            signal_mode=target_read.signal_mode,
+            hard_actionable=False,
+            note="Forward P/E is directional-only and excluded from hard peer verdict.",
+        )
+
+    favorable_percentile = _favorable_percentile(
+        target_read.value,
+        actionable_peer_values,
+        lower_is_better=True,
+    )
+
+    if favorable_percentile is None:
+        signal = "unknown"
+    elif favorable_percentile >= 65:
+        signal = "better_than_peers"
+    elif favorable_percentile <= 35:
+        signal = "worse_than_peers"
+    else:
+        signal = "in_line"
+
+    return PeerScoreMetric(
+        value=target_read.value,
+        peer_median=peer_median,
+        favorable_percentile=favorable_percentile,
+        signal=signal,
+        signal_mode=target_read.signal_mode,
+        hard_actionable=favorable_percentile is not None,
+        note=None,
+    )
 
 
 def _forward_earnings_growth(raw: PeerRaw, *, as_of: date) -> float | None:
@@ -150,14 +239,25 @@ def _valuation_vs_growth_fit(
     target: PeerRaw,
     peer_group: list[PeerRaw],
     as_of: date,
-    target_forward_pe: float | None,
+    target_forward_pe_read: _ForwardPERead,
+    peer_forward_pe_reads: list[_ForwardPERead],
 ) -> ValuationGrowthFit:
+    if target_forward_pe_read.signal_mode != "actionable" or target_forward_pe_read.value is None:
+        return ValuationGrowthFit(
+            fit_signal="insufficient",
+            weighting_active=False,
+            note="Target forward P/E is directional-only and excluded from hard valuation-vs-growth weighting.",
+        )
+
     peer_eps_points: list[tuple[float, float]] = []
-    for peer in peer_group:
+    for peer, forward_pe_read in zip(peer_group, peer_forward_pe_reads):
         growth = _forward_earnings_growth(peer, as_of=as_of)
-        forward_pe = _single_name_forward_pe(peer, as_of=as_of)
-        if growth is not None and forward_pe is not None:
-            peer_eps_points.append((growth, forward_pe))
+        if (
+            growth is not None
+            and forward_pe_read.signal_mode == "actionable"
+            and forward_pe_read.value is not None
+        ):
+            peer_eps_points.append((growth, forward_pe_read.value))
 
     fit_growth_metric = "forward_earnings_growth"
     target_growth = _forward_earnings_growth(target, as_of=as_of)
@@ -165,22 +265,25 @@ def _valuation_vs_growth_fit(
 
     if len(peer_points) < 5 or target_growth is None:
         peer_revenue_points: list[tuple[float, float]] = []
-        for peer in peer_group:
+        for peer, forward_pe_read in zip(peer_group, peer_forward_pe_reads):
             growth = _forward_revenue_growth(peer, as_of=as_of)
-            forward_pe = _single_name_forward_pe(peer, as_of=as_of)
-            if growth is not None and forward_pe is not None:
-                peer_revenue_points.append((growth, forward_pe))
+            if (
+                growth is not None
+                and forward_pe_read.signal_mode == "actionable"
+                and forward_pe_read.value is not None
+            ):
+                peer_revenue_points.append((growth, forward_pe_read.value))
         fit_growth_metric = "forward_revenue_growth"
         target_growth = _forward_revenue_growth(target, as_of=as_of)
         peer_points = peer_revenue_points
 
-    if len(peer_points) < 5 or target_growth is None or target_forward_pe is None:
+    if len(peer_points) < 5 or target_growth is None:
         return ValuationGrowthFit(
             fit_growth_metric=fit_growth_metric,
             peer_count=len(peer_points),
             fit_signal="insufficient",
             weighting_active=False,
-            note="Not enough peer coverage to evaluate valuation versus forward growth.",
+            note="Not enough actionable peer coverage to evaluate valuation versus forward growth.",
         )
 
     xs = [x for x, _ in peer_points]
@@ -207,7 +310,7 @@ def _valuation_vs_growth_fit(
             note="Regression produced a non-usable expected forward P/E.",
         )
 
-    residual_pct = (target_forward_pe - expected_forward_pe) / expected_forward_pe
+    residual_pct = (target_forward_pe_read.value - expected_forward_pe) / expected_forward_pe
     weighting_active = r_squared >= 0.8
 
     if residual_pct <= -0.15:
@@ -280,11 +383,9 @@ def build_peer_scorecard(
 
     peer_tickers = [peer.ticker for peer in peer_group]
 
-    target_forward_pe = _single_name_forward_pe(target, as_of=as_of)
-    peer_forward_pes = [
-        value
-        for value in (_single_name_forward_pe(peer, as_of=as_of) for peer in peer_group)
-        if value is not None
+    target_forward_pe_read = _single_name_forward_pe_read(target, as_of=as_of)
+    peer_forward_pe_reads = [
+        _single_name_forward_pe_read(peer, as_of=as_of) for peer in peer_group
     ]
 
     revenue_metric = _metric(
@@ -297,10 +398,9 @@ def build_peer_scorecard(
         [peer.earnings_growth_yoy for peer in peer_group if peer.earnings_growth_yoy is not None],
         lower_is_better=False,
     )
-    forward_pe_metric = _metric(
-        target_forward_pe,
-        peer_forward_pes,
-        lower_is_better=True,
+    forward_pe_metric = _forward_pe_metric(
+        target_read=target_forward_pe_read,
+        peer_reads=peer_forward_pe_reads,
     )
     leverage_metric = _metric(
         target.debt_to_ebitda,
@@ -311,7 +411,8 @@ def build_peer_scorecard(
         target=target,
         peer_group=peer_group,
         as_of=as_of,
-        target_forward_pe=target_forward_pe,
+        target_forward_pe_read=target_forward_pe_read,
+        peer_forward_pe_reads=peer_forward_pe_reads,
     )
 
     known_metrics = [
@@ -362,6 +463,9 @@ def build_peer_scorecard(
         elif fit_metric.fit_signal == "overvalued_vs_growth":
             note = f"{note} High-confidence valuation-vs-growth fit weakens the verdict."
         verdict = weighted_verdict
+
+    if not forward_pe_metric.hard_actionable and target_forward_pe_read.value is not None:
+        note = f"{note} Forward P/E was directional-only and excluded from hard valuation weighting."
 
     return PeerScorecard(
         ticker=target.ticker,

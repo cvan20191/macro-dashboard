@@ -15,10 +15,17 @@ function verdictColor(verdict?: string): string {
 }
 
 function formatMetric(label: string, metric?: PeerScoreMetric): string {
+  const actionability =
+    metric?.signal_mode != null
+      ? `${metric.signal_mode}${metric.hard_actionable ? '' : ' · excluded from hard verdict'}`
+      : null
+
   return (
     `${label}: ${metric?.value ?? '—'} · ` +
     `Peer median: ${metric?.peer_median ?? '—'} · ` +
-    `Favorable percentile: ${metric?.favorable_percentile ?? '—'}`
+    `Favorable percentile: ${metric?.favorable_percentile ?? '—'}` +
+    `${actionability ? ` · ${actionability}` : ''}` +
+    `${metric?.note ? ` · ${metric.note}` : ''}`
   )
 }
 

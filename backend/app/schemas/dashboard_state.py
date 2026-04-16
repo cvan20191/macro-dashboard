@@ -237,6 +237,9 @@ class PeerScoreMetric(BaseModel):
     peer_median: float | None = None
     favorable_percentile: float | None = None
     signal: str = "unknown"  # better_than_peers | in_line | worse_than_peers | unknown
+    signal_mode: str | None = None
+    hard_actionable: bool = False
+    note: str | None = None
 
 
 class ValuationGrowthFit(BaseModel):
