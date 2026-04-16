@@ -131,8 +131,12 @@ def build_deterministic_summary(
     if state.valuation is not None and state.valuation.signal_mode == "directional_only":
         cautions.append("Valuation signal is directional-only, not hard-actionable.")
 
-    if state.market_priced_easing is not None and state.market_priced_easing.pricing_stretch_active:
-        cautions.append("Market is already pricing aggressive easing, which looks stretched.")
+    if state.market_priced_easing is not None:
+        market_priced_easing = state.market_priced_easing
+        if market_priced_easing.pricing_stretch_active and market_priced_easing.hard_actionable:
+            cautions.append("Market is already pricing aggressive easing, which looks stretched.")
+        elif market_priced_easing.pricing_stretch_active and not market_priced_easing.hard_actionable:
+            cautions.append("Market-priced easing snapshot is stale; stretch read is descriptive only.")
 
     caution_line = " ".join(cautions) if cautions else None
 

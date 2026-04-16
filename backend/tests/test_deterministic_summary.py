@@ -145,6 +145,8 @@ def test_pricing_line_and_stretch_caution_render_from_existing_state() -> None:
             expected_cut_bps_12m=100.0,
             expected_cut_count_12m=4.0,
             pricing_stretch_active=True,
+            freshness_status="fresh",
+            hard_actionable=True,
         ),
     )
 
@@ -152,5 +154,34 @@ def test_pricing_line_and_stretch_caution_render_from_existing_state() -> None:
 
     assert summary.pricing_line == "Market pricing: about 4.0 cuts (100 bps) over the next 12 months."
     assert "Market is already pricing aggressive easing, which looks stretched." in (
+        summary.caution_line or ""
+    )
+
+
+def test_stale_pricing_stretch_renders_descriptive_only_caution() -> None:
+    state = DashboardState(
+        primary_regime="Quadrant C / Liquidity Transition",
+        current_posture="selective",
+        fed_chessboard=FedChessboard(
+            quadrant="C",
+            liquidity_transition_path="none",
+            transition_tag="Improving",
+        ),
+        market_priced_easing=MarketEasingExpectations(
+            source_mode="manual_snapshot",
+            as_of="2026-01-01",
+            current_target_mid=4.375,
+            expected_cut_bps_12m=100.0,
+            expected_cut_count_12m=4.0,
+            pricing_stretch_active=True,
+            freshness_status="stale",
+            data_age_days=20,
+            hard_actionable=False,
+        ),
+    )
+
+    summary = build_deterministic_summary(state, None)
+
+    assert "Market-priced easing snapshot is stale; stretch read is descriptive only." in (
         summary.caution_line or ""
     )

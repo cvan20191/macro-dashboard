@@ -26,6 +26,7 @@ Public API:
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 
 from app.schemas.dashboard_state import DataFreshness, DashboardState, ReasonedText, RegimeTransition
 from app.schemas.indicator_snapshot import IndicatorSnapshot
@@ -55,6 +56,15 @@ from app.services.rules.transitions import (
 )
 from app.services.rules.valuation import ValuationResult, compute_valuation
 from app.services.rules.watchpoints import compute_watchpoint_details, compute_watchpoints
+
+
+def _parse_as_of_date(raw: str | None):
+    if not raw:
+        return None
+    try:
+        return datetime.strptime(str(raw)[:10], "%Y-%m-%d").date()
+    except ValueError:
+        return None
 
 
 @dataclass
@@ -111,6 +121,7 @@ def _run_rules(snapshot: IndicatorSnapshot) -> _RuleOutputs:
         fedwatch_snapshot=fedwatch_snapshot,
         policy_optionality=policy_optionality.optionality,
         valuation=val.valuation,
+        current_as_of=_parse_as_of_date(snapshot.as_of),
     )
 
     # ── Step 6: Systemic Stress ───────────────────────────────────────────────

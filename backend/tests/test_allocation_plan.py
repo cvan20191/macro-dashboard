@@ -168,6 +168,8 @@ def test_pricing_stretch_downgrades_transition_mag7_lane_to_watch_only() -> None
         expected_cut_bps_12m=50.0,
         expected_cut_count_12m=2.0,
         pricing_stretch_active=True,
+        freshness_status="fresh",
+        hard_actionable=True,
     )
 
     result = compute_allocation_plan(

@@ -311,6 +311,9 @@ class MarketEasingExpectations(BaseModel):
     expected_cut_bps_12m: float | None = None
     expected_cut_count_12m: float | None = None
     pricing_stretch_active: bool = False
+    freshness_status: str = "unknown"  # fresh | stale | unavailable | unknown
+    data_age_days: int | None = None
+    hard_actionable: bool = False
     note: str | None = None
     meetings: list[MarketPricedCutPoint] = Field(default_factory=list)
 

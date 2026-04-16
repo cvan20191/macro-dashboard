@@ -8,7 +8,11 @@ def pricing_stretch_blocks_new_buys(
     fed_chessboard: FedChessboard | None,
     market_priced_easing: MarketEasingExpectations | None,
 ) -> bool:
-    if market_priced_easing is None or not market_priced_easing.pricing_stretch_active:
+    if market_priced_easing is None:
+        return False
+    if not market_priced_easing.pricing_stretch_active:
+        return False
+    if not market_priced_easing.hard_actionable:
         return False
 
     if fed_chessboard is None:

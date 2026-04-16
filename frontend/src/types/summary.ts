@@ -328,6 +328,9 @@ export interface MarketEasingExpectations {
   expected_cut_bps_12m?: number
   expected_cut_count_12m?: number
   pricing_stretch_active?: boolean
+  freshness_status?: string
+  data_age_days?: number | null
+  hard_actionable?: boolean
   note?: string | null
   meetings?: MarketPricedCutPoint[]
 }

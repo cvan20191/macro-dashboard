@@ -1,3 +1,5 @@
+from datetime import date
+
 from app.schemas.dashboard_state import PolicyOptionality, Valuation
 from app.services.rules.market_priced_easing import compute_market_priced_easing
 
@@ -47,6 +49,7 @@ def test_free_backdrop_does_not_mark_100bps_as_stretch_by_itself() -> None:
         fedwatch_snapshot=snapshot,
         policy_optionality=_policy("free"),
         valuation=_valuation(24.0, "Green"),
+        current_as_of=date(2026, 1, 12),
     )
 
     assert result.easing.expected_cut_bps_12m == 100.0
@@ -54,7 +57,7 @@ def test_free_backdrop_does_not_mark_100bps_as_stretch_by_itself() -> None:
     assert result.easing.pricing_stretch_active is False
 
 
-def test_late_2025_two_cuts_plus_high_valuation_is_stretch() -> None:
+def test_fresh_snapshot_can_be_hard_actionable() -> None:
     snapshot = {
         "as_of": "2025-09-20",
         "source_mode": "manual_snapshot",
@@ -69,11 +72,38 @@ def test_late_2025_two_cuts_plus_high_valuation_is_stretch() -> None:
         fedwatch_snapshot=snapshot,
         policy_optionality=_policy("limited"),
         valuation=_valuation(30.0, "Red"),
+        current_as_of=date(2025, 9, 22),
     )
 
     assert result.easing.expected_cut_bps_12m == 50.0
     assert result.easing.expected_cut_count_12m == 2.0
     assert result.easing.pricing_stretch_active is True
+    assert result.easing.freshness_status == "fresh"
+    assert result.easing.hard_actionable is True
+
+
+def test_stale_snapshot_is_descriptive_only() -> None:
+    snapshot = {
+        "as_of": "2025-09-01",
+        "source_mode": "manual_snapshot",
+        "current_target_mid": 4.375,
+        "meetings": [
+            {"meeting_label": "2025-11", "expected_end_rate_mid": 4.125},
+            {"meeting_label": "2025-12", "expected_end_rate_mid": 3.875},
+        ],
+    }
+
+    result = compute_market_priced_easing(
+        fedwatch_snapshot=snapshot,
+        policy_optionality=_policy("limited"),
+        valuation=_valuation(30.0, "Red"),
+        current_as_of=date(2025, 10, 2),
+    )
+
+    assert result.easing.pricing_stretch_active is True
+    assert result.easing.freshness_status == "stale"
+    assert result.easing.hard_actionable is False
+    assert "descriptive only" in (result.easing.note or "")
 
 
 def test_unavailable_snapshot_stays_nonfatal() -> None:
@@ -88,8 +118,11 @@ def test_unavailable_snapshot_stays_nonfatal() -> None:
         fedwatch_snapshot=snapshot,
         policy_optionality=_policy("unknown"),
         valuation=_valuation(24.0, "Green"),
+        current_as_of=date(2025, 10, 2),
     )
 
     assert result.easing.expected_cut_bps_12m is None
     assert result.easing.pricing_stretch_active is False
+    assert result.easing.freshness_status == "unavailable"
+    assert result.easing.hard_actionable is False
     assert "unavailable" in (result.easing.note or "").lower()

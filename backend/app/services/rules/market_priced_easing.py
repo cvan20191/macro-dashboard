@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import date, datetime
 from typing import Any
 
 from app.schemas.dashboard_state import (
@@ -9,6 +10,8 @@ from app.schemas.dashboard_state import (
     PolicyOptionality,
     Valuation,
 )
+
+_MAX_HARD_ACTIONABLE_AGE_DAYS = 7
 
 
 @dataclass(frozen=True)
@@ -25,15 +28,41 @@ def _to_float(value: Any) -> float | None:
         return None
 
 
+def _to_date(value: Any) -> date | None:
+    if value is None:
+        return None
+
+    raw = str(value)[:10]
+    try:
+        return datetime.strptime(raw, "%Y-%m-%d").date()
+    except ValueError:
+        return None
+
+
 def compute_market_priced_easing(
     *,
     fedwatch_snapshot: dict,
     policy_optionality: PolicyOptionality | None,
     valuation: Valuation | None,
+    current_as_of: date | None,
 ) -> MarketPricedEasingResult:
     current_target_mid = _to_float(fedwatch_snapshot.get("current_target_mid"))
     source_mode = str(fedwatch_snapshot.get("source_mode") or "manual_snapshot")
     as_of = fedwatch_snapshot.get("as_of")
+    snapshot_as_of = _to_date(as_of)
+
+    data_age_days: int | None = None
+    freshness_status = "unknown"
+    if snapshot_as_of is None:
+        freshness_status = "unavailable"
+    elif current_as_of is None:
+        freshness_status = "unknown"
+    else:
+        data_age_days = (current_as_of - snapshot_as_of).days
+        if 0 <= data_age_days <= _MAX_HARD_ACTIONABLE_AGE_DAYS:
+            freshness_status = "fresh"
+        else:
+            freshness_status = "stale"
 
     meeting_points: list[MarketPricedCutPoint] = []
     expected_cut_bps_12m: float | None = None
@@ -83,13 +112,21 @@ def compute_market_priced_easing(
         if expected_cut_bps_12m >= 75.0 and not free_backdrop:
             pricing_stretch_active = True
 
+    hard_actionable = pricing_stretch_active and freshness_status == "fresh"
+
     if expected_cut_bps_12m is None:
         note = "Market-priced easing snapshot is unavailable."
+    elif pricing_stretch_active and not hard_actionable:
+        note = (
+            f"The market is pricing about {expected_cut_count_12m} cuts / "
+            f"{expected_cut_bps_12m:.0f} bps, but the FedWatch snapshot is stale, "
+            "so this read is descriptive only."
+        )
     elif pricing_stretch_active:
         note = (
             f"The market is pricing about {expected_cut_count_12m} cuts / "
-            f"{expected_cut_bps_12m:.0f} bps over the next 12 months, which looks "
-            "stretched relative to the current backdrop."
+            f"{expected_cut_bps_12m:.0f} bps, which looks stretched relative "
+            "to the current backdrop."
         )
     else:
         note = (
@@ -105,6 +142,9 @@ def compute_market_priced_easing(
             expected_cut_bps_12m=expected_cut_bps_12m,
             expected_cut_count_12m=expected_cut_count_12m,
             pricing_stretch_active=pricing_stretch_active,
+            freshness_status=freshness_status,
+            data_age_days=data_age_days,
+            hard_actionable=hard_actionable,
             note=note,
             meetings=meeting_points,
         )
