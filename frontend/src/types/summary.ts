@@ -300,6 +300,20 @@ export interface StrategicWatchlist {
   note?: string | null
 }
 
+export interface AllocationLane {
+  cohort_code?: string
+  label?: string
+  permission?: string
+  reason?: string | null
+}
+
+export interface AllocationPlan {
+  portfolio_action?: string
+  total_cash_cap_pct?: number
+  lanes?: AllocationLane[]
+  note?: string | null
+}
+
 export interface DashboardState {
   as_of?: string
   data_freshness: DataFreshness
@@ -334,6 +348,7 @@ export interface DashboardState {
   deterministic_summary?: DeterministicSummary
   peer_scorecards?: PeerScorecard[]
   strategic_watchlist?: StrategicWatchlist
+  allocation_plan?: AllocationPlan
   top_watchpoints: string[]
   top_watchpoint_details?: Array<{ code: string; text: string }>
   what_changed: string[]

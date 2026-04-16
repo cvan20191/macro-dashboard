@@ -34,6 +34,10 @@ export function HeadlineBanner({ state }: Props) {
   const headline = det?.headline ?? state?.primary_regime ?? 'Macro Playbook'
   const expanded = det?.subheadline ?? null
   const actionLine = det?.action_line ?? null
+  const allocationLine =
+    state?.allocation_plan?.note != null
+      ? `Allocation: ${state.allocation_plan.note}`
+      : null
   const profileLine = det?.profile_line ?? null
   const peerLine = det?.peer_line ?? null
   const cautionLine = det?.caution_line ?? null
@@ -63,6 +67,7 @@ export function HeadlineBanner({ state }: Props) {
       {/* Expanded */}
       {expanded ? <p style={styles.expanded}>{expanded}</p> : null}
       {actionLine ? <p style={styles.inlineLine}>{actionLine}</p> : null}
+      {allocationLine ? <p style={styles.inlineLine}>{allocationLine}</p> : null}
       {profileLine ? <p style={styles.inlineLine}>{profileLine}</p> : null}
       {peerLine ? <p style={styles.inlineLine}>{peerLine}</p> : null}
       {cautionLine ? <p style={styles.caution}>{cautionLine}</p> : null}

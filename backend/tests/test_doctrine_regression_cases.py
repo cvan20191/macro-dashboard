@@ -282,7 +282,7 @@ def test_a_regime_exit_signal_appears_when_liquidity_support_stops_confirming() 
     assert conclusion is not None
 
 
-def test_early_april_transition_now_consumes_cohort_valuations_in_rotation_guidance() -> None:
+def test_early_april_transition_has_consistent_top_line_and_cohort_action() -> None:
     snapshot = make_snapshot(
         as_of="2025-04-10T00:00:00Z",
         fed_funds_rate=4.50,
@@ -347,6 +347,12 @@ def test_early_april_transition_now_consumes_cohort_valuations_in_rotation_guida
     item_map = {item.cohort_code: item for item in state.cohort_rotation_guidance.items}
     assert item_map["mag7"].stance == "accumulate_slowly"
     assert state.primary_regime.startswith("Quadrant D")
+    assert state.allocation_plan is not None
+    assert state.allocation_plan.portfolio_action == "defensive_only"
+    assert state.exposure_guidance is not None
+    assert state.exposure_guidance.max_cash_deployment_pct == 20
+    lane_map = {lane.cohort_code: lane for lane in state.allocation_plan.lanes}
+    assert lane_map["mag7"].permission == "allowed"
     assert conclusion is not None
     assert conclusion.new_cash_action == "accumulate_selectively"
 

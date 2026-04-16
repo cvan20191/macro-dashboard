@@ -30,6 +30,7 @@ from dataclasses import dataclass
 from app.schemas.dashboard_state import DataFreshness, DashboardState, ReasonedText, RegimeTransition
 from app.schemas.indicator_snapshot import IndicatorSnapshot
 from app.schemas.playbook_conclusion import PlaybookConclusion
+from app.services.rules.allocation_plan import AllocationPlanResult, compute_allocation_plan
 from app.services.rules.chessboard import ChessboardResult, compute_chessboard
 from app.services.rules.cohort_rotation import CohortRotationResult, compute_cohort_rotation_guidance
 from app.services.rules.exit_discipline import ExitDisciplineResult, compute_exit_discipline_signal
@@ -66,6 +67,7 @@ class _RuleOutputs:
     exit_signal: ExitDisciplineResult
     cohort_rotation: CohortRotationResult
     strategic_watchlist: StrategicWatchlistResult
+    allocation_plan: AllocationPlanResult
     watchpoints: list
     watchpoint_details: list[ReasonedText]
     what_changed: list
@@ -125,7 +127,14 @@ def _run_rules(snapshot: IndicatorSnapshot) -> _RuleOutputs:
         liquidity_plumbing=plumbing.plumbing,
     )
 
-    # ── Step 13: Top Watchpoints ──────────────────────────────────────────────
+    # ── Step 13: Allocation Plan ─────────────────────────────────────────────
+    allocation_plan = compute_allocation_plan(
+        fed_chessboard=cb.chessboard,
+        exposure_guidance=regime.exposure_guidance,
+        cohort_rotation_guidance=cohort_rotation.guidance,
+    )
+
+    # ── Step 14: Top Watchpoints ──────────────────────────────────────────────
     watchpoints = compute_watchpoints(
         cb, stag, val, stress, dollar, regime.primary_regime, plumbing
     )
@@ -133,15 +142,15 @@ def _run_rules(snapshot: IndicatorSnapshot) -> _RuleOutputs:
         cb, stag, val, stress, dollar, regime.primary_regime, plumbing
     )
 
-    # ── Step 14: What Changed ─────────────────────────────────────────────────
+    # ── Step 15: What Changed ─────────────────────────────────────────────────
     what_changed = compute_what_changed(snapshot, cb, stag, val, stress)
     what_changed_details = compute_what_changed_details(snapshot, cb, stag, val, stress)
 
-    # ── Step 15: What Changes the Call ────────────────────────────────────────
+    # ── Step 16: What Changes the Call ────────────────────────────────────────
     what_changes_call = compute_what_changes_call(regime, val, stag, stress, cb)
     what_changes_call_details = compute_what_changes_call_details(regime, val, stag, stress, cb)
 
-    # ── Step 16: Freshness ────────────────────────────────────────────────────
+    # ── Step 17: Freshness ────────────────────────────────────────────────────
     freshness = DataFreshness(
         overall_status=snapshot.data_freshness.overall_status or "unknown",
         stale_series=snapshot.data_freshness.stale_series,
@@ -160,6 +169,7 @@ def _run_rules(snapshot: IndicatorSnapshot) -> _RuleOutputs:
         exit_signal=exit_signal,
         cohort_rotation=cohort_rotation,
         strategic_watchlist=strategic_watchlist,
+        allocation_plan=allocation_plan,
         watchpoints=watchpoints,
         watchpoint_details=watchpoint_details,
         what_changed=what_changed,
@@ -310,6 +320,7 @@ def _assemble_state(snapshot: IndicatorSnapshot, r: _RuleOutputs) -> DashboardSt
         exit_discipline_signal=r.exit_signal.signal,
         cohort_rotation_guidance=r.cohort_rotation.guidance,
         strategic_watchlist=r.strategic_watchlist.watchlist,
+        allocation_plan=r.allocation_plan.plan,
         top_watchpoints=r.watchpoints,
         top_watchpoint_details=r.watchpoint_details,
         what_changed=r.what_changed,

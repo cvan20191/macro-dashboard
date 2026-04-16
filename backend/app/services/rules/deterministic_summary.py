@@ -41,6 +41,22 @@ def _peer_line(state: DashboardState) -> str | None:
     return "Peer check: same-sector comparison is available, but no clear leader is standing out."
 
 
+def _allocation_line(state: DashboardState) -> str | None:
+    plan = state.allocation_plan
+    if plan is None:
+        return None
+
+    allowed = [lane.label for lane in plan.lanes if lane.permission == "allowed"]
+    blocked = [lane.label for lane in plan.lanes if lane.permission == "blocked"]
+
+    parts: list[str] = [f"Allocation plan: {plan.portfolio_action}."]
+    if allowed:
+        parts.append("Allowed lanes: " + ", ".join(allowed) + ".")
+    if blocked:
+        parts.append("Blocked lanes: " + ", ".join(blocked) + ".")
+    return " ".join(parts)
+
+
 def build_deterministic_summary(
     state: DashboardState,
     conclusion: PlaybookConclusion | None = None,
@@ -75,14 +91,7 @@ def build_deterministic_summary(
             f"leverage allowed = {'yes' if state.exposure_guidance.leverage_allowed else 'no'}."
         )
 
-    cohort_line = None
-    if state.cohort_rotation_guidance is not None and state.cohort_rotation_guidance.items:
-        favored = state.cohort_rotation_guidance.favored_cohort_codes or []
-        if favored:
-            cohort_line = "Favored cohorts: " + ", ".join(favored) + "."
-        elif state.cohort_rotation_guidance.defensive_anchor_code:
-            cohort_line = "Defensive anchor: " + state.cohort_rotation_guidance.defensive_anchor_code + "."
-
+    cohort_line = _allocation_line(state)
     profile_line = _profile_line(state)
     peer_line = _peer_line(state)
 

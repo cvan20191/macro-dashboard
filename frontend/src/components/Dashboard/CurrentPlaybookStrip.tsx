@@ -72,6 +72,10 @@ export function CurrentPlaybookStrip({ state, playbookConclusion }: Props) {
   const deploymentLine = det?.deployment_line ?? null
   const cohortLine = det?.cohort_line ?? null
   const profileLine = det?.profile_line ?? null
+  const allocation = state.allocation_plan
+  const allocationLine = allocation
+    ? `Allocation: ${allocation.portfolio_action ?? 'wait'} within ${allocation.total_cash_cap_pct ?? 0}% cap.`
+    : null
   const cautionLine = det?.caution_line ?? null
   const exitNote = state.exit_discipline_signal?.active
     ? (state.exit_discipline_signal.note ?? 'Exit discipline is active.')
@@ -98,6 +102,7 @@ export function CurrentPlaybookStrip({ state, playbookConclusion }: Props) {
       {subheadline && <p style={s.expanded}>{subheadline}</p>}
       {actionLine && <p style={s.inlineLine}>{actionLine}</p>}
       {deploymentLine && <p style={s.inlineLineMuted}>{deploymentLine}</p>}
+      {allocationLine && <p style={s.inlineLineMuted}>{allocationLine}</p>}
       {cohortLine && <p style={s.inlineLineMuted}>{cohortLine}</p>}
       {profileLine && <p style={s.inlineLineMuted}>{profileLine}</p>}
       {exitNote && <p style={s.cautionLine}>{exitNote}</p>}

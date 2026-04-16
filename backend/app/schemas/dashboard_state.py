@@ -283,6 +283,20 @@ class StrategicWatchlist(BaseModel):
     note: str | None = None
 
 
+class AllocationLane(BaseModel):
+    cohort_code: str
+    label: str
+    permission: str = "watch_only"  # allowed | watch_only | blocked
+    reason: str | None = None
+
+
+class AllocationPlan(BaseModel):
+    portfolio_action: str = "wait"  # deploy_within_cap | defensive_only | pause_broad_market_adds | wait
+    total_cash_cap_pct: int = 0
+    lanes: list[AllocationLane] = Field(default_factory=list)
+    note: str | None = None
+
+
 class ReasonedText(BaseModel):
     code: str
     text: str
@@ -324,6 +338,7 @@ class DashboardState(BaseModel):
     deterministic_summary: DeterministicSummary | None = None
     peer_scorecards: list[PeerScorecard] = Field(default_factory=list)
     strategic_watchlist: StrategicWatchlist | None = None
+    allocation_plan: AllocationPlan | None = None
     top_watchpoints: list[str] = Field(default_factory=list)
     top_watchpoint_details: list[ReasonedText] = Field(default_factory=list)
     what_changed: list[str] = Field(default_factory=list)
