@@ -57,6 +57,21 @@ def _allocation_line(state: DashboardState) -> str | None:
     return " ".join(parts)
 
 
+def _pricing_line(state: DashboardState) -> str | None:
+    market_priced_easing = state.market_priced_easing
+    if (
+        market_priced_easing is None
+        or market_priced_easing.expected_cut_count_12m is None
+        or market_priced_easing.expected_cut_bps_12m is None
+    ):
+        return None
+
+    return (
+        f"Market pricing: about {market_priced_easing.expected_cut_count_12m} cuts "
+        f"({market_priced_easing.expected_cut_bps_12m:.0f} bps) over the next 12 months."
+    )
+
+
 def build_deterministic_summary(
     state: DashboardState,
     conclusion: PlaybookConclusion | None = None,
@@ -94,6 +109,7 @@ def build_deterministic_summary(
     cohort_line = _allocation_line(state)
     profile_line = _profile_line(state)
     peer_line = _peer_line(state)
+    pricing_line = _pricing_line(state)
 
     cautions: list[str] = []
 
@@ -115,6 +131,9 @@ def build_deterministic_summary(
     if state.valuation is not None and state.valuation.signal_mode == "directional_only":
         cautions.append("Valuation signal is directional-only, not hard-actionable.")
 
+    if state.market_priced_easing is not None and state.market_priced_easing.pricing_stretch_active:
+        cautions.append("Market is already pricing aggressive easing, which looks stretched.")
+
     caution_line = " ".join(cautions) if cautions else None
 
     return DeterministicSummary(
@@ -125,5 +144,6 @@ def build_deterministic_summary(
         cohort_line=cohort_line,
         profile_line=profile_line,
         peer_line=peer_line,
+        pricing_line=pricing_line,
         caution_line=caution_line,
     )

@@ -70,6 +70,7 @@ export function CurrentPlaybookStrip({ state, playbookConclusion }: Props) {
   const subheadline = det?.subheadline ?? null
   const actionLine = det?.action_line ?? null
   const deploymentLine = det?.deployment_line ?? null
+  const pricingLine = det?.pricing_line ?? null
   const cohortLine = det?.cohort_line ?? null
   const profileLine = det?.profile_line ?? null
   const allocation = state.allocation_plan
@@ -102,6 +103,7 @@ export function CurrentPlaybookStrip({ state, playbookConclusion }: Props) {
       {subheadline && <p style={s.expanded}>{subheadline}</p>}
       {actionLine && <p style={s.inlineLine}>{actionLine}</p>}
       {deploymentLine && <p style={s.inlineLineMuted}>{deploymentLine}</p>}
+      {pricingLine && <p style={s.inlineLineMuted}>{pricingLine}</p>}
       {allocationLine && <p style={s.inlineLineMuted}>{allocationLine}</p>}
       {cohortLine && <p style={s.inlineLineMuted}>{cohortLine}</p>}
       {profileLine && <p style={s.inlineLineMuted}>{profileLine}</p>}

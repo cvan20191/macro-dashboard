@@ -6,6 +6,7 @@ from app.schemas.dashboard_state import (
     ExposureGuidance,
     FedChessboard,
     LiquidityPlumbing,
+    MarketEasingExpectations,
     PeerScorecard,
 )
 from app.schemas.playbook_conclusion import PlaybookConclusion
@@ -126,3 +127,30 @@ def test_profile_and_peer_lines_are_rendered_from_existing_state() -> None:
         "Emerging profile: Emerging C-type: high growth / refinancing beneficiary."
     )
     assert summary.peer_line == "Peer check: current leaders versus same-sector peers = NVDA, MSFT."
+
+
+def test_pricing_line_and_stretch_caution_render_from_existing_state() -> None:
+    state = DashboardState(
+        primary_regime="Quadrant C / Liquidity Transition",
+        current_posture="selective",
+        fed_chessboard=FedChessboard(
+            quadrant="C",
+            liquidity_transition_path="none",
+            transition_tag="Improving",
+        ),
+        market_priced_easing=MarketEasingExpectations(
+            source_mode="manual_snapshot",
+            as_of="2026-01-10",
+            current_target_mid=4.375,
+            expected_cut_bps_12m=100.0,
+            expected_cut_count_12m=4.0,
+            pricing_stretch_active=True,
+        ),
+    )
+
+    summary = build_deterministic_summary(state, None)
+
+    assert summary.pricing_line == "Market pricing: about 4.0 cuts (100 bps) over the next 12 months."
+    assert "Market is already pricing aggressive easing, which looks stretched." in (
+        summary.caution_line or ""
+    )

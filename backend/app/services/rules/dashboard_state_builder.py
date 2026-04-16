@@ -30,11 +30,16 @@ from dataclasses import dataclass
 from app.schemas.dashboard_state import DataFreshness, DashboardState, ReasonedText, RegimeTransition
 from app.schemas.indicator_snapshot import IndicatorSnapshot
 from app.schemas.playbook_conclusion import PlaybookConclusion
+from app.services.providers.fedwatch_client import load_fedwatch_snapshot
 from app.services.rules.allocation_plan import AllocationPlanResult, compute_allocation_plan
 from app.services.rules.chessboard import ChessboardResult, compute_chessboard
 from app.services.rules.cohort_rotation import CohortRotationResult, compute_cohort_rotation_guidance
 from app.services.rules.exit_discipline import ExitDisciplineResult, compute_exit_discipline_signal
 from app.services.rules.liquidity_plumbing import LiquidityPlumbingResult, compute_liquidity_plumbing
+from app.services.rules.market_priced_easing import (
+    MarketPricedEasingResult,
+    compute_market_priced_easing,
+)
 from app.services.rules.playbook_conclusion import build_playbook_conclusion
 from app.services.rules.policy_optionality import PolicyOptionalityResult, compute_policy_optionality
 from app.services.rules.rally import RallyResult, compute_rally
@@ -68,6 +73,7 @@ class _RuleOutputs:
     cohort_rotation: CohortRotationResult
     strategic_watchlist: StrategicWatchlistResult
     allocation_plan: AllocationPlanResult
+    market_priced_easing: MarketPricedEasingResult
     watchpoints: list
     watchpoint_details: list[ReasonedText]
     what_changed: list
@@ -98,6 +104,14 @@ def _run_rules(snapshot: IndicatorSnapshot) -> _RuleOutputs:
 
     # ── Step 5: Policy Optionality ────────────────────────────────────────────
     policy_optionality = compute_policy_optionality(snapshot.growth, snapshot.inflation)
+
+    # ── Step 5b: Market-Priced Easing ────────────────────────────────────────
+    fedwatch_snapshot = load_fedwatch_snapshot()
+    market_priced_easing = compute_market_priced_easing(
+        fedwatch_snapshot=fedwatch_snapshot,
+        policy_optionality=policy_optionality.optionality,
+        valuation=val.valuation,
+    )
 
     # ── Step 6: Systemic Stress ───────────────────────────────────────────────
     stress = compute_stress(snapshot.systemic_stress)
@@ -170,6 +184,7 @@ def _run_rules(snapshot: IndicatorSnapshot) -> _RuleOutputs:
         cohort_rotation=cohort_rotation,
         strategic_watchlist=strategic_watchlist,
         allocation_plan=allocation_plan,
+        market_priced_easing=market_priced_easing,
         watchpoints=watchpoints,
         watchpoint_details=watchpoint_details,
         what_changed=what_changed,
@@ -321,6 +336,7 @@ def _assemble_state(snapshot: IndicatorSnapshot, r: _RuleOutputs) -> DashboardSt
         cohort_rotation_guidance=r.cohort_rotation.guidance,
         strategic_watchlist=r.strategic_watchlist.watchlist,
         allocation_plan=r.allocation_plan.plan,
+        market_priced_easing=r.market_priced_easing.easing,
         top_watchpoints=r.watchpoints,
         top_watchpoint_details=r.watchpoint_details,
         what_changed=r.what_changed,

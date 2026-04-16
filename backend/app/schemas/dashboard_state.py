@@ -229,6 +229,7 @@ class DeterministicSummary(BaseModel):
     cohort_line: str | None = None
     profile_line: str | None = None
     peer_line: str | None = None
+    pricing_line: str | None = None
     caution_line: str | None = None
 
 
@@ -297,6 +298,23 @@ class AllocationPlan(BaseModel):
     note: str | None = None
 
 
+class MarketPricedCutPoint(BaseModel):
+    meeting_label: str
+    expected_end_rate_mid: float | None = None
+    cumulative_cut_bps: float | None = None
+
+
+class MarketEasingExpectations(BaseModel):
+    source_mode: str = "manual_snapshot"  # manual_snapshot | cme_fedwatch_api
+    as_of: str | None = None
+    current_target_mid: float | None = None
+    expected_cut_bps_12m: float | None = None
+    expected_cut_count_12m: float | None = None
+    pricing_stretch_active: bool = False
+    note: str | None = None
+    meetings: list[MarketPricedCutPoint] = Field(default_factory=list)
+
+
 class ReasonedText(BaseModel):
     code: str
     text: str
@@ -339,6 +357,7 @@ class DashboardState(BaseModel):
     peer_scorecards: list[PeerScorecard] = Field(default_factory=list)
     strategic_watchlist: StrategicWatchlist | None = None
     allocation_plan: AllocationPlan | None = None
+    market_priced_easing: MarketEasingExpectations | None = None
     top_watchpoints: list[str] = Field(default_factory=list)
     top_watchpoint_details: list[ReasonedText] = Field(default_factory=list)
     what_changed: list[str] = Field(default_factory=list)

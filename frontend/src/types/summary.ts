@@ -246,6 +246,7 @@ export interface DeterministicSummary {
   cohort_line?: string | null
   profile_line?: string | null
   peer_line?: string | null
+  pricing_line?: string | null
   caution_line?: string | null
 }
 
@@ -314,6 +315,23 @@ export interface AllocationPlan {
   note?: string | null
 }
 
+export interface MarketPricedCutPoint {
+  meeting_label?: string
+  expected_end_rate_mid?: number
+  cumulative_cut_bps?: number
+}
+
+export interface MarketEasingExpectations {
+  source_mode?: string
+  as_of?: string | null
+  current_target_mid?: number
+  expected_cut_bps_12m?: number
+  expected_cut_count_12m?: number
+  pricing_stretch_active?: boolean
+  note?: string | null
+  meetings?: MarketPricedCutPoint[]
+}
+
 export interface DashboardState {
   as_of?: string
   data_freshness: DataFreshness
@@ -349,6 +367,7 @@ export interface DashboardState {
   peer_scorecards?: PeerScorecard[]
   strategic_watchlist?: StrategicWatchlist
   allocation_plan?: AllocationPlan
+  market_priced_easing?: MarketEasingExpectations
   top_watchpoints: string[]
   top_watchpoint_details?: Array<{ code: string; text: string }>
   what_changed: string[]
