@@ -300,6 +300,7 @@ class AllocationPlan(BaseModel):
 
 class MarketPricedCutPoint(BaseModel):
     meeting_label: str
+    meeting_date: str | None = None
     expected_end_rate_mid: float | None = None
     cumulative_cut_bps: float | None = None
 

@@ -1,12 +1,25 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 DEFAULT_FEDWATCH_SNAPSHOT_PATH = (
     Path(__file__).resolve().parents[2] / "data" / "fedwatch_snapshot.json"
 )
+
+
+def _normalize_meeting_date(value: Any) -> str | None:
+    if value is None:
+        return None
+
+    raw = str(value)[:10]
+    try:
+        datetime.strptime(raw, "%Y-%m-%d")
+    except ValueError:
+        return None
+    return raw
 
 
 def load_fedwatch_snapshot(path: Path | None = None) -> dict[str, Any]:
@@ -35,9 +48,21 @@ def load_fedwatch_snapshot(path: Path | None = None) -> dict[str, Any]:
     if not isinstance(meetings, list):
         raise ValueError("fedwatch_snapshot.json -> meetings must be a list.")
 
+    normalized_meetings: list[dict[str, Any]] = []
+    for row in meetings:
+        if not isinstance(row, dict):
+            continue
+        normalized_meetings.append(
+            {
+                "meeting_label": row.get("meeting_label"),
+                "meeting_date": _normalize_meeting_date(row.get("meeting_date")),
+                "expected_end_rate_mid": row.get("expected_end_rate_mid"),
+            }
+        )
+
     return {
         "as_of": raw.get("as_of"),
         "source_mode": raw.get("source_mode") or "manual_snapshot",
         "current_target_mid": raw.get("current_target_mid"),
-        "meetings": meetings,
+        "meetings": normalized_meetings,
     }

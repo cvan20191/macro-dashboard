@@ -12,6 +12,7 @@ from app.schemas.dashboard_state import (
 )
 
 _MAX_HARD_ACTIONABLE_AGE_DAYS = 7
+_TWELVE_MONTH_HORIZON_DAYS = 370
 
 
 @dataclass(frozen=True)
@@ -64,11 +65,12 @@ def compute_market_priced_easing(
         else:
             freshness_status = "stale"
 
-    meeting_points: list[MarketPricedCutPoint] = []
-    expected_cut_bps_12m: float | None = None
+    raw_meetings = fedwatch_snapshot.get("meetings", [])
+    parsed_meetings: list[tuple[date | None, MarketPricedCutPoint]] = []
 
-    for row in fedwatch_snapshot.get("meetings", []):
+    for row in raw_meetings:
         meeting_label = str(row.get("meeting_label") or "")
+        meeting_date = _to_date(row.get("meeting_date"))
         expected_end_rate_mid = _to_float(row.get("expected_end_rate_mid"))
 
         cumulative_cut_bps = None
@@ -77,15 +79,32 @@ def compute_market_priced_easing(
                 0.0,
                 round((current_target_mid - expected_end_rate_mid) * 100.0, 1),
             )
-            expected_cut_bps_12m = cumulative_cut_bps
 
-        meeting_points.append(
-            MarketPricedCutPoint(
-                meeting_label=meeting_label,
-                expected_end_rate_mid=expected_end_rate_mid,
-                cumulative_cut_bps=cumulative_cut_bps,
+        parsed_meetings.append(
+            (
+                meeting_date,
+                MarketPricedCutPoint(
+                    meeting_label=meeting_label,
+                    meeting_date=row.get("meeting_date"),
+                    expected_end_rate_mid=expected_end_rate_mid,
+                    cumulative_cut_bps=cumulative_cut_bps,
+                ),
             )
         )
+
+    parsed_meetings.sort(key=lambda item: (item[0] is None, item[0] or date.max))
+    meeting_points = [point for _, point in parsed_meetings]
+
+    expected_cut_bps_12m: float | None = None
+    if current_as_of is not None:
+        horizon_candidates = [
+            point
+            for meeting_date, point in parsed_meetings
+            if meeting_date is not None
+            and 0 <= (meeting_date - current_as_of).days <= _TWELVE_MONTH_HORIZON_DAYS
+        ]
+        if horizon_candidates:
+            expected_cut_bps_12m = horizon_candidates[-1].cumulative_cut_bps
 
     expected_cut_count_12m = None
     if expected_cut_bps_12m is not None:
@@ -112,15 +131,26 @@ def compute_market_priced_easing(
         if expected_cut_bps_12m >= 75.0 and not free_backdrop:
             pricing_stretch_active = True
 
-    hard_actionable = pricing_stretch_active and freshness_status == "fresh"
+    dated_meetings_available = any(meeting_date is not None for meeting_date, _ in parsed_meetings)
+    hard_actionable = (
+        pricing_stretch_active
+        and freshness_status == "fresh"
+        and dated_meetings_available
+        and expected_cut_bps_12m is not None
+    )
 
-    if expected_cut_bps_12m is None:
+    if expected_cut_bps_12m is None and not dated_meetings_available:
+        note = (
+            "Market-priced easing snapshot lacks machine-readable meeting dates, "
+            "so the 12-month read is unavailable."
+        )
+    elif expected_cut_bps_12m is None:
         note = "Market-priced easing snapshot is unavailable."
     elif pricing_stretch_active and not hard_actionable:
         note = (
             f"The market is pricing about {expected_cut_count_12m} cuts / "
-            f"{expected_cut_bps_12m:.0f} bps, but the FedWatch snapshot is stale, "
-            "so this read is descriptive only."
+            f"{expected_cut_bps_12m:.0f} bps, but the FedWatch read is not "
+            "hard-actionable, so this is descriptive only."
         )
     elif pricing_stretch_active:
         note = (

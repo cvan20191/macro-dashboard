@@ -317,6 +317,7 @@ export interface AllocationPlan {
 
 export interface MarketPricedCutPoint {
   meeting_label?: string
+  meeting_date?: string | null
   expected_end_rate_mid?: number
   cumulative_cut_bps?: number
 }

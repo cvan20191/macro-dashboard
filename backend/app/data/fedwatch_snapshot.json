@@ -2,5 +2,11 @@
   "as_of": null,
   "source_mode": "manual_snapshot",
   "current_target_mid": null,
-  "meetings": []
+  "meetings": [
+    {
+      "meeting_label": "2026-03 FOMC",
+      "meeting_date": null,
+      "expected_end_rate_mid": null
+    }
+  ]
 }

@@ -422,8 +422,8 @@ def test_late_september_style_stretch_blocks_new_buying_but_keeps_positions(
             "source_mode": "manual_snapshot",
             "current_target_mid": 4.25,
             "meetings": [
-                {"meeting_label": "2025-11", "expected_end_rate_mid": 4.0},
-                {"meeting_label": "2025-12", "expected_end_rate_mid": 3.75},
+                {"meeting_label": "2025-11", "meeting_date": "2025-11-06", "expected_end_rate_mid": 4.0},
+                {"meeting_label": "2025-12", "meeting_date": "2025-12-17", "expected_end_rate_mid": 3.75},
             ],
         },
     )
