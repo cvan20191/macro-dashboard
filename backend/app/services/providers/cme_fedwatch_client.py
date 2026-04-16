@@ -176,3 +176,75 @@ def bucket_probabilities(
             hold += p
     implied = implied_num / implied_den if implied_den > 0 else None
     return hold, cut25, cut50, hike25, implied
+
+
+def _implied_mid_bps(rate_ranges: list[dict[str, Any]]) -> float | None:
+    implied_num = 0.0
+    implied_den = 0.0
+    for rr in rate_ranges:
+        lo = float(rr["lower_rate_bps"])
+        hi = float(rr["upper_rate_bps"])
+        p = float(rr["probability"])
+        implied_num += ((lo + hi) / 2.0) * p
+        implied_den += p
+    if implied_den <= 0:
+        return None
+    return implied_num / implied_den
+
+
+def _snapshot_label(meeting_date: str) -> str:
+    if len(meeting_date) >= 7:
+        return meeting_date[:7]
+    return meeting_date
+
+
+def fetch_normalized_fedwatch_snapshot(
+    *,
+    current_target_mid: float | None = None,
+    timeout: int = 30,
+    raw_forecasts: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    """
+    Normalize CME FedWatch API output into the repo's shared snapshot contract.
+
+    This keeps credential handling and raw transport inside the existing CME
+    client, while exposing the same shape consumed by the core dashboard and
+    overlay fallback policy.
+    """
+
+    forecasts = raw_forecasts if raw_forecasts is not None else fetch_forecasts_raw(timeout=timeout)
+
+    meetings_out: list[dict[str, Any]] = []
+    snapshot_as_of: str | None = None
+
+    for item in forecasts:
+        if not isinstance(item, dict):
+            continue
+
+        norm = normalize_forecast_entry(item)
+        meeting_date = str(norm.get("meeting_date") or "")
+        source_timestamp = str(norm.get("source_timestamp") or "")
+        rate_ranges = norm.get("rate_ranges") or []
+        implied_mid_bps = _implied_mid_bps(rate_ranges)
+
+        if snapshot_as_of is None and source_timestamp:
+            snapshot_as_of = source_timestamp[:10]
+
+        meetings_out.append(
+            {
+                "meeting_label": _snapshot_label(meeting_date),
+                "meeting_date": meeting_date or None,
+                "expected_end_rate_mid": (
+                    round(float(implied_mid_bps) / 100.0, 4)
+                    if implied_mid_bps is not None
+                    else None
+                ),
+            }
+        )
+
+    return {
+        "as_of": snapshot_as_of,
+        "source_mode": "cme_fedwatch_api",
+        "current_target_mid": current_target_mid,
+        "meetings": meetings_out,
+    }

@@ -31,7 +31,8 @@ from datetime import datetime
 from app.schemas.dashboard_state import DataFreshness, DashboardState, ReasonedText, RegimeTransition
 from app.schemas.indicator_snapshot import IndicatorSnapshot
 from app.schemas.playbook_conclusion import PlaybookConclusion
-from app.services.providers.fedwatch_client import load_fedwatch_snapshot
+from app.services.providers.cme_fedwatch_client import fetch_normalized_fedwatch_snapshot
+from app.services.providers.fedwatch_client import load_best_fedwatch_snapshot
 from app.services.rules.allocation_plan import AllocationPlanResult, compute_allocation_plan
 from app.services.rules.chessboard import ChessboardResult, compute_chessboard
 from app.services.rules.cohort_rotation import CohortRotationResult, compute_cohort_rotation_guidance
@@ -116,12 +117,19 @@ def _run_rules(snapshot: IndicatorSnapshot) -> _RuleOutputs:
     policy_optionality = compute_policy_optionality(snapshot.growth, snapshot.inflation)
 
     # ── Step 5b: Market-Priced Easing ────────────────────────────────────────
-    fedwatch_snapshot = load_fedwatch_snapshot()
+    current_as_of = _parse_as_of_date(snapshot.as_of)
+    fedwatch_snapshot = load_best_fedwatch_snapshot(
+        current_as_of=current_as_of,
+        current_target_mid=snapshot.liquidity.fed_funds_rate,
+        fetch_live_snapshot=lambda: fetch_normalized_fedwatch_snapshot(
+            current_target_mid=snapshot.liquidity.fed_funds_rate,
+        ),
+    )
     market_priced_easing = compute_market_priced_easing(
         fedwatch_snapshot=fedwatch_snapshot,
         policy_optionality=policy_optionality.optionality,
         valuation=val.valuation,
-        current_as_of=_parse_as_of_date(snapshot.as_of),
+        current_as_of=current_as_of,
     )
 
     # ── Step 6: Systemic Stress ───────────────────────────────────────────────

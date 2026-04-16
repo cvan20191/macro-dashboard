@@ -416,8 +416,8 @@ def test_late_september_style_stretch_blocks_new_buying_but_keeps_positions(
 
     monkeypatch.setattr(
         dashboard_state_builder_module,
-        "load_fedwatch_snapshot",
-        lambda: {
+        "load_best_fedwatch_snapshot",
+        lambda **kwargs: {
             "as_of": "2025-09-30",
             "source_mode": "manual_snapshot",
             "current_target_mid": 4.25,

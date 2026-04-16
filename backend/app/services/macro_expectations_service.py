@@ -32,6 +32,8 @@ from app.services.providers import cme_fedwatch_client as cme
 from app.services.providers import ny_fed_markets_client as ny_fed
 from app.services.providers import trading_economics_client as te
 from app.services.providers.base import ProviderError
+from app.services.providers.cme_fedwatch_client import fetch_normalized_fedwatch_snapshot
+from app.services.providers.fedwatch_client import load_best_fedwatch_snapshot
 from app.services.rules.stagflation import inflation_inputs_incomplete
 
 logger = logging.getLogger(__name__)
@@ -97,35 +99,19 @@ def _fed_target_bps(snapshot: IndicatorSnapshot | None) -> int | None:
     return int(round(float(r) * 100))
 
 
-def _load_manual_fed_pricing() -> dict[str, Any] | None:
-    path = Path(__file__).resolve().parents[1] / "data" / "fed_pricing_manual.json"
-    if not path.is_file():
+def _parse_as_of_date(raw: str | None):
+    if not raw:
         return None
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
+        return datetime.strptime(str(raw)[:10], "%Y-%m-%d").date()
+    except ValueError:
         return None
 
 
-def _normalize_meetings_from_manual(obj: dict[str, Any]) -> list[dict[str, Any]]:
-    rows = []
-    for m in obj.get("meetings") or []:
-        if not isinstance(m, dict):
-            continue
-        rows.append({
-            "meeting_date": str(m.get("meeting_date", "")),
-            "source_timestamp": str(m.get("source_timestamp", obj.get("as_of", ""))),
-            "probability_hold": m.get("probability_hold"),
-            "probability_cut_25": m.get("probability_cut_25"),
-            "probability_cut_50": m.get("probability_cut_50"),
-            "probability_hike_25": m.get("probability_hike_25"),
-            "repricing_delta_label": str(m.get("repricing_delta_label", "little changed")),
-        })
-    return rows
-
-
-def _meetings_from_cme_api(fed_bps: int | None) -> list[dict[str, Any]]:
-    raw_list = cme.fetch_forecasts_raw(timeout=settings.http_timeout_seconds)
+def _meetings_from_cme_forecasts(
+    raw_list: list[dict[str, Any]],
+    fed_bps: int | None,
+) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     for item in raw_list[:8]:
         if not isinstance(item, dict):
@@ -143,6 +129,24 @@ def _meetings_from_cme_api(fed_bps: int | None) -> list[dict[str, Any]]:
             "repricing_delta_label": "little changed",
         })
     return out
+
+
+def _snapshot_rows_from_fedwatch_snapshot(snapshot: dict[str, Any]) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    source_timestamp = str(snapshot.get("as_of") or "")
+    for row in snapshot.get("meetings") or []:
+        if not isinstance(row, dict):
+            continue
+        rows.append({
+            "meeting_date": str(row.get("meeting_date") or row.get("meeting_label") or ""),
+            "source_timestamp": source_timestamp,
+            "probability_hold": None,
+            "probability_cut_25": None,
+            "probability_cut_50": None,
+            "probability_hike_25": None,
+            "repricing_delta_label": "little changed",
+        })
+    return rows
 
 
 def _apply_repricing_deltas(
@@ -335,58 +339,73 @@ def get_macro_expectations_state(
 
     # --- Fed pricing ---
     meetings: list[dict[str, Any]] = []
+    current_as_of = _parse_as_of_date(snapshot.as_of if snapshot is not None else None)
+    current_target_mid = (fed_bps / 100.0) if fed_bps is not None else None
     cached_fw, fw_stale_disk, _ = _read_cache(_FW_CACHE, _TTL_FW, force_refresh)
-    if cached_fw is not None and isinstance(cached_fw, list) and not force_refresh and not fw_stale_disk:
-        meetings = cached_fw
+    live_fw_meetings: list[dict[str, Any]] | None = None
+
+    def _fetch_live_snapshot() -> dict[str, Any]:
+        nonlocal live_fw_meetings
+        raw_list = cme.fetch_forecasts_raw(timeout=settings.http_timeout_seconds)
+        live_fw_meetings = _meetings_from_cme_forecasts(raw_list, fed_bps)
+        return fetch_normalized_fedwatch_snapshot(
+            current_target_mid=current_target_mid,
+            timeout=settings.http_timeout_seconds,
+            raw_forecasts=raw_list,
+        )
+
+    try:
+        fedwatch_snapshot = load_best_fedwatch_snapshot(
+            current_as_of=current_as_of,
+            current_target_mid=current_target_mid,
+            fetch_live_snapshot=_fetch_live_snapshot if cme.is_api_configured() else None,
+        )
+    except Exception as exc:
+        logger.warning("FedWatch provider policy failed: %s", exc)
+        fedwatch_snapshot = {
+            "as_of": None,
+            "source_mode": "manual_snapshot",
+            "current_target_mid": current_target_mid,
+            "meetings": [],
+        }
+
+    source_mode = str(fedwatch_snapshot.get("source_mode") or "")
+    if source_mode == "cme_fedwatch_api" and live_fw_meetings is not None:
+        meetings = live_fw_meetings
+        _apply_repricing_deltas(meetings)
+        _persist_fedwatch_prev(meetings)
+        _save_disk(_FW_CACHE, _wrap_cache_payload(meetings, _TTL_FW))
         sources.append(MacroSourceAttribution(
-            provider="CME FedWatch (cache)",
+            provider="CME FedWatch",
             fetched_at=now_iso,
             stale=False,
         ))
+    elif source_mode == "cme_fedwatch_cache":
+        meetings = (
+            cached_fw
+            if isinstance(cached_fw, list) and cached_fw
+            else _snapshot_rows_from_fedwatch_snapshot(fedwatch_snapshot)
+        )
+        sources.append(MacroSourceAttribution(
+            provider="CME FedWatch (cache)",
+            fetched_at=now_iso,
+            stale=fw_stale_disk,
+        ))
+    elif source_mode == "manual_snapshot":
+        meetings = _snapshot_rows_from_fedwatch_snapshot(fedwatch_snapshot)
+        sources.append(MacroSourceAttribution(
+            provider="FedWatch snapshot (manual fallback)",
+            fetched_at=now_iso,
+            stale=False,
+            note="Source: manual snapshot — as of " + str(fedwatch_snapshot.get("as_of", "unknown")),
+        ))
     else:
-        got = False
-        try:
-            if cme.is_api_configured():
-                meetings = _meetings_from_cme_api(fed_bps)
-                _apply_repricing_deltas(meetings)
-                _persist_fedwatch_prev(meetings)
-                _save_disk(_FW_CACHE, _wrap_cache_payload(meetings, _TTL_FW))
-                sources.append(MacroSourceAttribution(
-                    provider="CME FedWatch",
-                    fetched_at=now_iso,
-                    stale=False,
-                ))
-                got = True
-        except (ProviderError, Exception) as exc:
-            logger.warning("CME FedWatch failed: %s", exc)
-        if not got:
-            manual = _load_manual_fed_pricing()
-            if manual:
-                meetings = _normalize_meetings_from_manual(manual)
-                fw_note = "Source: manual entry — as of " + str(manual.get("as_of", "unknown"))
-                _apply_repricing_deltas(meetings)
-                _persist_fedwatch_prev(meetings)
-                sources.append(MacroSourceAttribution(
-                    provider="Fed pricing (manual JSON)",
-                    fetched_at=now_iso,
-                    stale=False,
-                    note=fw_note,
-                ))
-                got = True
-            elif isinstance(cached_fw, list):
-                meetings = cached_fw
-                sources.append(MacroSourceAttribution(
-                    provider="CME FedWatch (stale cache)",
-                    fetched_at=now_iso,
-                    stale=True,
-                ))
-            else:
-                sources.append(MacroSourceAttribution(
-                    provider="CME FedWatch",
-                    fetched_at=now_iso,
-                    stale=True,
-                    note="No API, no manual file, no cache",
-                ))
+        sources.append(MacroSourceAttribution(
+            provider="CME FedWatch",
+            fetched_at=now_iso,
+            stale=True,
+            note="No live, cache, or manual FedWatch snapshot available",
+        ))
 
     fed_rows: list[FedPricingTableRow] = []
     fed_shift_hawk = False
