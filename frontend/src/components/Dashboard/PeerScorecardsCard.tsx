@@ -1,6 +1,6 @@
 import type { CSSProperties } from 'react'
 
-import type { DashboardState, PeerScoreMetric } from '../../types/summary'
+import type { DashboardState, PeerScoreMetric, ValuationGrowthFit } from '../../types/summary'
 import { Card } from '../ui/Card'
 
 interface Props {
@@ -22,6 +22,29 @@ function formatMetric(label: string, metric?: PeerScoreMetric): string {
   )
 }
 
+function formatFitValue(value?: number): string {
+  return value == null ? '—' : `${value}`
+}
+
+function renderFit(fit?: ValuationGrowthFit) {
+  if (!fit) return null
+
+  return (
+    <div style={styles.fitBox}>
+      <div style={styles.fitLine}>
+        Valuation vs growth fit: {fit.fit_signal ?? 'insufficient'}
+        {fit.weighting_active ? ' · high confidence' : ' · low confidence'}
+      </div>
+      <div style={styles.fitLine}>
+        Metric: {fit.fit_growth_metric ?? '—'} · R²: {formatFitValue(fit.r_squared)} · Expected P/E:{' '}
+        {formatFitValue(fit.expected_forward_pe)}
+      </div>
+      <div style={styles.fitLine}>Residual: {formatFitValue(fit.residual_pct)}</div>
+      {fit.note ? <div style={styles.fitLine}>{fit.note}</div> : null}
+    </div>
+  )
+}
+
 export default function PeerScorecardsCard({ state }: Props) {
   const cards = state?.peer_scorecards
   if (!cards || cards.length === 0) return null
@@ -36,7 +59,7 @@ export default function PeerScorecardsCard({ state }: Props) {
   return (
     <Card title="Same-Sector Peer Scorecards">
       <p style={styles.note}>
-        Revenue growth, earnings growth, forward P/E, and debt/EBITDA versus peers.
+        Revenue growth, earnings growth, forward P/E, debt/EBITDA, and valuation-vs-growth fit versus peers.
       </p>
 
       <div style={styles.stack}>
@@ -58,6 +81,8 @@ export default function PeerScorecardsCard({ state }: Props) {
               <div style={styles.metric}>{formatMetric('Forward P/E', card.forward_pe)}</div>
               <div style={styles.metric}>{formatMetric('Debt / EBITDA', card.debt_to_ebitda)}</div>
             </div>
+
+            {renderFit(card.valuation_vs_growth_fit)}
 
             {card.peer_tickers && card.peer_tickers.length > 0 ? (
               <div style={styles.meta}>Peers: {card.peer_tickers.join(', ')}</div>
@@ -123,6 +148,20 @@ const styles: Record<string, CSSProperties> = {
     fontSize: '12px',
     lineHeight: 1.5,
     color: 'var(--text-secondary)',
+  },
+  fitBox: {
+    border: '1px solid var(--border-subtle)',
+    borderRadius: 'var(--radius-xs)',
+    padding: '10px 12px',
+    background: 'color-mix(in srgb, var(--bg-card-raised) 70%, transparent)',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '4px',
+  },
+  fitLine: {
+    fontSize: '12px',
+    lineHeight: 1.5,
+    color: 'var(--text-muted)',
   },
   reason: {
     fontSize: '13px',

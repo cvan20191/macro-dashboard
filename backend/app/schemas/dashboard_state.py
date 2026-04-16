@@ -239,6 +239,17 @@ class PeerScoreMetric(BaseModel):
     signal: str = "unknown"  # better_than_peers | in_line | worse_than_peers | unknown
 
 
+class ValuationGrowthFit(BaseModel):
+    fit_growth_metric: str | None = None
+    peer_count: int = 0
+    r_squared: float | None = None
+    expected_forward_pe: float | None = None
+    residual_pct: float | None = None
+    fit_signal: str = "insufficient"  # undervalued_vs_growth | fairly_priced_vs_growth | overvalued_vs_growth | insufficient
+    weighting_active: bool = False
+    note: str | None = None
+
+
 class PeerScorecard(BaseModel):
     ticker: str
     sector: str | None = None
@@ -248,6 +259,7 @@ class PeerScorecard(BaseModel):
     earnings_growth: PeerScoreMetric = Field(default_factory=PeerScoreMetric)
     forward_pe: PeerScoreMetric = Field(default_factory=PeerScoreMetric)
     debt_to_ebitda: PeerScoreMetric = Field(default_factory=PeerScoreMetric)
+    valuation_vs_growth_fit: ValuationGrowthFit = Field(default_factory=ValuationGrowthFit)
     verdict: str = "insufficient"  # leader | balanced | fragile | insufficient
     same_sector_peer_compare_required: bool = True
     note: str | None = None

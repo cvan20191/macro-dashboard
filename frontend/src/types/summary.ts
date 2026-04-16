@@ -256,6 +256,17 @@ export interface PeerScoreMetric {
   signal?: string
 }
 
+export interface ValuationGrowthFit {
+  fit_growth_metric?: string | null
+  peer_count?: number
+  r_squared?: number
+  expected_forward_pe?: number
+  residual_pct?: number
+  fit_signal?: string
+  weighting_active?: boolean
+  note?: string | null
+}
+
 export interface PeerScorecard {
   ticker?: string
   sector?: string | null
@@ -265,6 +276,7 @@ export interface PeerScorecard {
   earnings_growth?: PeerScoreMetric
   forward_pe?: PeerScoreMetric
   debt_to_ebitda?: PeerScoreMetric
+  valuation_vs_growth_fit?: ValuationGrowthFit
   verdict?: string
   same_sector_peer_compare_required?: boolean
   note?: string | null
