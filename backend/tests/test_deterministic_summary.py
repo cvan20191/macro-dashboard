@@ -1,10 +1,12 @@
 from app.schemas.dashboard_state import (
     CohortRotationGuidance,
     DashboardState,
+    EquityProfileGuidance,
     ExitDisciplineSignal,
     ExposureGuidance,
     FedChessboard,
     LiquidityPlumbing,
+    PeerScorecard,
 )
 from app.schemas.playbook_conclusion import PlaybookConclusion
 from app.services.rules.deterministic_summary import build_deterministic_summary
@@ -92,3 +94,35 @@ def test_plumbing_not_qe_is_rendered_deterministically() -> None:
     summary = build_deterministic_summary(state, None)
 
     assert "Balance-sheet support is plumbing support, not QE." in (summary.caution_line or "")
+
+
+def test_profile_and_peer_lines_are_rendered_from_existing_state() -> None:
+    state = DashboardState(
+        primary_regime="Quadrant D / Illiquid Regime",
+        current_posture="defensive",
+        fed_chessboard=FedChessboard(
+            quadrant="D",
+            liquidity_transition_path="D_to_C",
+            transition_tag="Improving",
+        ),
+        equity_profile_guidance=EquityProfileGuidance(
+            primary_profile_code="stock_a_type",
+            primary_profile_label="Stable / low valuation / low leverage / solvent",
+            emerging_profile_code="stock_c_type",
+            emerging_profile_label="Emerging C-type: high growth / refinancing beneficiary",
+            exit_discipline_required=False,
+        ),
+        peer_scorecards=[
+            PeerScorecard(ticker="NVDA", verdict="leader"),
+            PeerScorecard(ticker="MSFT", verdict="leader"),
+            PeerScorecard(ticker="ORCL", verdict="balanced"),
+        ],
+    )
+
+    summary = build_deterministic_summary(state, None)
+
+    assert summary.profile_line == (
+        "Primary stock profile: Stable / low valuation / low leverage / solvent. "
+        "Emerging profile: Emerging C-type: high growth / refinancing beneficiary."
+    )
+    assert summary.peer_line == "Peer check: current leaders versus same-sector peers = NVDA, MSFT."

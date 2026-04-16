@@ -244,6 +244,8 @@ export interface DeterministicSummary {
   action_line?: string | null
   deployment_line?: string | null
   cohort_line?: string | null
+  profile_line?: string | null
+  peer_line?: string | null
   caution_line?: string | null
 }
 

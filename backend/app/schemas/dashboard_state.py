@@ -227,6 +227,8 @@ class DeterministicSummary(BaseModel):
     action_line: str | None = None
     deployment_line: str | None = None
     cohort_line: str | None = None
+    profile_line: str | None = None
+    peer_line: str | None = None
     caution_line: str | None = None
 
 

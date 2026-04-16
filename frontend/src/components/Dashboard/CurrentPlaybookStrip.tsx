@@ -71,7 +71,11 @@ export function CurrentPlaybookStrip({ state, playbookConclusion }: Props) {
   const actionLine = det?.action_line ?? null
   const deploymentLine = det?.deployment_line ?? null
   const cohortLine = det?.cohort_line ?? null
+  const profileLine = det?.profile_line ?? null
   const cautionLine = det?.caution_line ?? null
+  const exitNote = state.exit_discipline_signal?.active
+    ? (state.exit_discipline_signal.note ?? 'Exit discipline is active.')
+    : null
 
   return (
     <div style={{ ...s.wrapper, borderLeft: `3px solid ${rVars.fg}` }}>
@@ -95,6 +99,8 @@ export function CurrentPlaybookStrip({ state, playbookConclusion }: Props) {
       {actionLine && <p style={s.inlineLine}>{actionLine}</p>}
       {deploymentLine && <p style={s.inlineLineMuted}>{deploymentLine}</p>}
       {cohortLine && <p style={s.inlineLineMuted}>{cohortLine}</p>}
+      {profileLine && <p style={s.inlineLineMuted}>{profileLine}</p>}
+      {exitNote && <p style={s.cautionLine}>{exitNote}</p>}
       {cautionLine && <p style={s.cautionLine}>{cautionLine}</p>}
 
       {/* Posture */}

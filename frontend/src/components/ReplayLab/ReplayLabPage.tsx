@@ -143,7 +143,6 @@ export function ReplayLabPage({ onGoLive }: Props) {
         {/* Dashboard cards — always visible when data is loaded */}
         {!loadingPlaybook && playbook && (() => {
           const state = normalizeState(playbook.state)
-          const summary = playbook.summary
 
           return (
             <div style={s.grid}>
@@ -177,7 +176,7 @@ export function ReplayLabPage({ onGoLive }: Props) {
 
               {/* In revealed mode: show Watchlist */}
               {revealed && (
-                <WatchlistCard state={state} summary={summary} />
+                <WatchlistCard state={state} />
               )}
 
               {/* In blind mode: assessment form — full width */}

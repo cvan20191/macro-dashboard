@@ -219,7 +219,7 @@ export function DashboardPage() {
 
               {/* Row 4: Systemic Stress + Watchlist */}
               <SystemicStressCard stress={state.systemic_stress} sources={sources} />
-              <WatchlistCard state={state} summary={data.summary} />
+              <WatchlistCard state={state} />
 
               {/* Row 5: Things to Look Out For — full width */}
               {data.catalysts && (

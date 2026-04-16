@@ -18,6 +18,29 @@ def _action_text(action: str | None) -> str | None:
     return None
 
 
+def _profile_line(state: DashboardState) -> str | None:
+    guide = state.equity_profile_guidance
+    if guide is None:
+        return None
+
+    base = f"Primary stock profile: {guide.primary_profile_label}."
+    if guide.emerging_profile_label:
+        base += f" Emerging profile: {guide.emerging_profile_label}."
+    if guide.exit_discipline_required:
+        base += " Exit discipline is required."
+    return base
+
+
+def _peer_line(state: DashboardState) -> str | None:
+    if not state.peer_scorecards:
+        return None
+
+    leaders = [card.ticker for card in state.peer_scorecards if card.verdict == "leader"]
+    if leaders:
+        return f"Peer check: current leaders versus same-sector peers = {', '.join(leaders[:3])}."
+    return "Peer check: same-sector comparison is available, but no clear leader is standing out."
+
+
 def build_deterministic_summary(
     state: DashboardState,
     conclusion: PlaybookConclusion | None = None,
@@ -60,6 +83,9 @@ def build_deterministic_summary(
         elif state.cohort_rotation_guidance.defensive_anchor_code:
             cohort_line = "Defensive anchor: " + state.cohort_rotation_guidance.defensive_anchor_code + "."
 
+    profile_line = _profile_line(state)
+    peer_line = _peer_line(state)
+
     cautions: list[str] = []
 
     if state.policy_optionality is not None:
@@ -88,5 +114,7 @@ def build_deterministic_summary(
         action_line=action_line,
         deployment_line=deployment_line,
         cohort_line=cohort_line,
+        profile_line=profile_line,
+        peer_line=peer_line,
         caution_line=caution_line,
     )
