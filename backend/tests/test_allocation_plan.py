@@ -165,8 +165,9 @@ def test_pricing_stretch_downgrades_transition_mag7_lane_to_watch_only() -> None
         defensive_anchor_code="non_ai_low_valuation_defensive",
     )
     market_priced_easing = MarketEasingExpectations(
-        expected_cut_bps_12m=50.0,
-        expected_cut_count_12m=2.0,
+        expected_cut_bps_rest_of_year=50.0,
+        expected_cut_count_rest_of_year=2.0,
+        pricing_horizon_label="rest_of_calendar_year",
         pricing_stretch_active=True,
         freshness_status="fresh",
         hard_actionable=True,

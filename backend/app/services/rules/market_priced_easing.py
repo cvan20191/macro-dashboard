@@ -12,7 +12,6 @@ from app.schemas.dashboard_state import (
 )
 
 _MAX_HARD_ACTIONABLE_AGE_DAYS = 7
-_TWELVE_MONTH_HORIZON_DAYS = 370
 
 
 @dataclass(frozen=True)
@@ -95,20 +94,21 @@ def compute_market_priced_easing(
     parsed_meetings.sort(key=lambda item: (item[0] is None, item[0] or date.max))
     meeting_points = [point for _, point in parsed_meetings]
 
-    expected_cut_bps_12m: float | None = None
+    expected_cut_bps_rest_of_year: float | None = None
     if current_as_of is not None:
-        horizon_candidates = [
+        same_year_candidates = [
             point
             for meeting_date, point in parsed_meetings
             if meeting_date is not None
-            and 0 <= (meeting_date - current_as_of).days <= _TWELVE_MONTH_HORIZON_DAYS
+            and meeting_date >= current_as_of
+            and meeting_date.year == current_as_of.year
         ]
-        if horizon_candidates:
-            expected_cut_bps_12m = horizon_candidates[-1].cumulative_cut_bps
+        if same_year_candidates:
+            expected_cut_bps_rest_of_year = same_year_candidates[-1].cumulative_cut_bps
 
-    expected_cut_count_12m = None
-    if expected_cut_bps_12m is not None:
-        expected_cut_count_12m = round(expected_cut_bps_12m / 25.0, 1)
+    expected_cut_count_rest_of_year = None
+    if expected_cut_bps_rest_of_year is not None:
+        expected_cut_count_rest_of_year = round(expected_cut_bps_rest_of_year / 25.0, 1)
 
     constraint_level = (
         policy_optionality.constraint_level if policy_optionality is not None else "unknown"
@@ -123,12 +123,12 @@ def compute_market_priced_easing(
         )
 
     pricing_stretch_active = False
-    if expected_cut_bps_12m is not None:
-        if expected_cut_bps_12m >= 50.0 and constraint_level in {"limited", "trapped", "unknown"}:
+    if expected_cut_bps_rest_of_year is not None:
+        if expected_cut_bps_rest_of_year >= 50.0 and constraint_level in {"limited", "trapped", "unknown"}:
             pricing_stretch_active = True
-        if expected_cut_bps_12m >= 50.0 and valuation_stretched:
+        if expected_cut_bps_rest_of_year >= 50.0 and valuation_stretched:
             pricing_stretch_active = True
-        if expected_cut_bps_12m >= 75.0 and not free_backdrop:
+        if expected_cut_bps_rest_of_year >= 75.0 and not free_backdrop:
             pricing_stretch_active = True
 
     dated_meetings_available = any(meeting_date is not None for meeting_date, _ in parsed_meetings)
@@ -136,32 +136,34 @@ def compute_market_priced_easing(
         pricing_stretch_active
         and freshness_status == "fresh"
         and dated_meetings_available
-        and expected_cut_bps_12m is not None
+        and expected_cut_bps_rest_of_year is not None
     )
 
-    if expected_cut_bps_12m is None and not dated_meetings_available:
+    if expected_cut_bps_rest_of_year is None and not dated_meetings_available:
         note = (
             "Market-priced easing snapshot lacks machine-readable meeting dates, "
-            "so the 12-month read is unavailable."
+            "so the year-end read is unavailable."
         )
-    elif expected_cut_bps_12m is None:
-        note = "Market-priced easing snapshot is unavailable."
+    elif expected_cut_bps_rest_of_year is None:
+        note = (
+            "Market-priced easing snapshot is available, but no remaining dated meetings "
+            "exist in the current calendar year."
+        )
     elif pricing_stretch_active and not hard_actionable:
         note = (
-            f"The market is pricing about {expected_cut_count_12m} cuts / "
-            f"{expected_cut_bps_12m:.0f} bps, but the FedWatch read is not "
-            "hard-actionable, so this is descriptive only."
+            f"The market is pricing about {expected_cut_count_rest_of_year} more cuts / "
+            f"{expected_cut_bps_rest_of_year:.0f} bps by year-end, but this FedWatch "
+            "read is descriptive only."
         )
     elif pricing_stretch_active:
         note = (
-            f"The market is pricing about {expected_cut_count_12m} cuts / "
-            f"{expected_cut_bps_12m:.0f} bps, which looks stretched relative "
-            "to the current backdrop."
+            f"The market is pricing about {expected_cut_count_rest_of_year} more cuts / "
+            f"{expected_cut_bps_rest_of_year:.0f} bps by year-end, which looks stretched."
         )
     else:
         note = (
-            f"The market is pricing about {expected_cut_count_12m} cuts / "
-            f"{expected_cut_bps_12m:.0f} bps over the next 12 months."
+            f"The market is pricing about {expected_cut_count_rest_of_year} more cuts / "
+            f"{expected_cut_bps_rest_of_year:.0f} bps by year-end."
         )
 
     return MarketPricedEasingResult(
@@ -169,8 +171,9 @@ def compute_market_priced_easing(
             source_mode=source_mode,
             as_of=as_of,
             current_target_mid=current_target_mid,
-            expected_cut_bps_12m=expected_cut_bps_12m,
-            expected_cut_count_12m=expected_cut_count_12m,
+            expected_cut_bps_rest_of_year=expected_cut_bps_rest_of_year,
+            expected_cut_count_rest_of_year=expected_cut_count_rest_of_year,
+            pricing_horizon_label="rest_of_calendar_year",
             pricing_stretch_active=pricing_stretch_active,
             freshness_status=freshness_status,
             data_age_days=data_age_days,

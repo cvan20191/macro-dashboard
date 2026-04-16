@@ -61,14 +61,14 @@ def _pricing_line(state: DashboardState) -> str | None:
     market_priced_easing = state.market_priced_easing
     if (
         market_priced_easing is None
-        or market_priced_easing.expected_cut_count_12m is None
-        or market_priced_easing.expected_cut_bps_12m is None
+        or market_priced_easing.expected_cut_count_rest_of_year is None
+        or market_priced_easing.expected_cut_bps_rest_of_year is None
     ):
         return None
 
     return (
-        f"Market pricing: about {market_priced_easing.expected_cut_count_12m} cuts "
-        f"({market_priced_easing.expected_cut_bps_12m:.0f} bps) over the next 12 months."
+        f"Market pricing: about {market_priced_easing.expected_cut_count_rest_of_year} more cuts "
+        f"({market_priced_easing.expected_cut_bps_rest_of_year:.0f} bps) by year-end."
     )
 
 

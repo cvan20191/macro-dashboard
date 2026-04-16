@@ -142,8 +142,9 @@ def test_pricing_line_and_stretch_caution_render_from_existing_state() -> None:
             source_mode="manual_snapshot",
             as_of="2026-01-10",
             current_target_mid=4.375,
-            expected_cut_bps_12m=100.0,
-            expected_cut_count_12m=4.0,
+            expected_cut_bps_rest_of_year=100.0,
+            expected_cut_count_rest_of_year=4.0,
+            pricing_horizon_label="rest_of_calendar_year",
             pricing_stretch_active=True,
             freshness_status="fresh",
             hard_actionable=True,
@@ -152,7 +153,7 @@ def test_pricing_line_and_stretch_caution_render_from_existing_state() -> None:
 
     summary = build_deterministic_summary(state, None)
 
-    assert summary.pricing_line == "Market pricing: about 4.0 cuts (100 bps) over the next 12 months."
+    assert summary.pricing_line == "Market pricing: about 4.0 more cuts (100 bps) by year-end."
     assert "Market is already pricing aggressive easing, which looks stretched." in (
         summary.caution_line or ""
     )
@@ -171,8 +172,9 @@ def test_stale_pricing_stretch_renders_descriptive_only_caution() -> None:
             source_mode="manual_snapshot",
             as_of="2026-01-01",
             current_target_mid=4.375,
-            expected_cut_bps_12m=100.0,
-            expected_cut_count_12m=4.0,
+            expected_cut_bps_rest_of_year=100.0,
+            expected_cut_count_rest_of_year=4.0,
+            pricing_horizon_label="rest_of_calendar_year",
             pricing_stretch_active=True,
             freshness_status="stale",
             data_age_days=20,

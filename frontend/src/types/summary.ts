@@ -326,8 +326,9 @@ export interface MarketEasingExpectations {
   source_mode?: string
   as_of?: string | null
   current_target_mid?: number
-  expected_cut_bps_12m?: number
-  expected_cut_count_12m?: number
+  expected_cut_bps_rest_of_year?: number
+  expected_cut_count_rest_of_year?: number
+  pricing_horizon_label?: string
   pricing_stretch_active?: boolean
   freshness_status?: string
   data_age_days?: number | null

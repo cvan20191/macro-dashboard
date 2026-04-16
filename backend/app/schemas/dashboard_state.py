@@ -309,8 +309,9 @@ class MarketEasingExpectations(BaseModel):
     source_mode: str = "manual_snapshot"  # manual_snapshot | cme_fedwatch_api
     as_of: str | None = None
     current_target_mid: float | None = None
-    expected_cut_bps_12m: float | None = None
-    expected_cut_count_12m: float | None = None
+    expected_cut_bps_rest_of_year: float | None = None
+    expected_cut_count_rest_of_year: float | None = None
+    pricing_horizon_label: str = "rest_of_calendar_year"
     pricing_stretch_active: bool = False
     freshness_status: str = "unknown"  # fresh | stale | unavailable | unknown
     data_age_days: int | None = None
