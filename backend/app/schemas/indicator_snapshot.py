@@ -18,24 +18,15 @@ class DataFreshnessInput(BaseModel):
 
 
 class LiquidityInput(BaseModel):
+    # Raw levels
     fed_funds_rate: float | None = None
-    # Legacy compatibility fields — retained for debug / backward compatibility,
-    # but no longer doctrine-facing.
-    rate_trend_1m: str | None = None       # "up" | "down" | "flat"
-    rate_trend_3m: str | None = None
     balance_sheet_assets: float | None = None
-    balance_sheet_trend_1m: str | None = None   # "up" | "down" | "flat"
-    balance_sheet_trend_3m: str | None = None
-    # Normalized position of current rate within trailing cycle range.
-    # 0.0 = at cycle low, 1.0 = at cycle high.
-    # Computed by normalizer from trailing 36-month rate history.
-    # None when insufficient history is available.
-    rate_cycle_position: float | None = None
-    # Doctrine-facing quadrant inputs.
-    rate_direction_medium_term: str | None = None
-    rate_impulse_short: str | None = None
-    balance_sheet_direction_medium_term: str | None = None
-    balance_sheet_pace: str | None = None
+
+    # Doctrine-facing quadrant inputs only
+    rate_direction_medium_term: str | None = None          # easing | tightening | stable | unknown
+    rate_impulse_short: str | None = None                  # confirming_easing | confirming_tightening | mixed | stable | unknown
+    balance_sheet_direction_medium_term: str | None = None # expanding | contracting | flat_or_mixed
+    balance_sheet_pace: str | None = None                  # contracting_slower | contracting_same_or_faster | expanding_slower | expanding_same_or_faster | flat_or_mixed
     quadrant_basis_note: str | None = None
 
 

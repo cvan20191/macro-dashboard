@@ -132,10 +132,6 @@ def _median_ratio(series: list[tuple[str, float]], lookback_days: int) -> float 
     return round(values[-1] / baseline, 4)
 
 
-def _rate_trend(series: list[tuple[str, float]], lookback_days: int) -> str:
-    return _trend_by_absolute_delta(series, lookback_days, _RATE_BPS_THRESHOLD)
-
-
 def _latest_distinct_rate_move(series: list[tuple[str, float]]) -> tuple[str, date | None]:
     """
     Infer the actual medium-term policy path from the latest distinct target move.
@@ -235,29 +231,6 @@ def _balance_sheet_pace(series: list[tuple[str, float]], medium_term: str) -> st
             return "expanding_slower"
         return "expanding_same_or_faster"
     return "flat_or_mixed"
-
-
-def _compute_cycle_position(series: list[tuple[str, float]]) -> float | None:
-    """
-    Return the current rate's normalized position within the trailing series range.
-
-    cycle_position = (current - cycle_low) / (cycle_high - cycle_low)
-
-    Returns None when:
-    - fewer than 12 observations are available (insufficient history)
-    - the range is effectively flat (< 0.05 percentage points)
-
-    This is a heuristic implementation helper, not speaker doctrine.
-    It is used by chessboard.py as a secondary input to _policy_stance().
-    """
-    if len(series) < 12:
-        return None
-    values = [v for _, v in series]
-    lo, hi = min(values), max(values)
-    if hi - lo < 0.05:
-        # Rate has been essentially flat throughout the window — not useful
-        return None
-    return round((values[-1] - lo) / (hi - lo), 3)
 
 
 # ---------------------------------------------------------------------------
@@ -439,10 +412,6 @@ def build_indicator_snapshot(
     rate_series = get_series("fed_funds_rate")
     bs_series = get_series("balance_sheet")
 
-    rate_t1m = _rate_trend(rate_series, 21)
-    rate_t3m = _rate_trend(rate_series, 63)
-    bs_t1m = _trend_by_absolute_delta(bs_series, 28, _BALANCE_SHEET_DELTA_THRESHOLD)
-    bs_t3m = _trend_by_absolute_delta(bs_series, 91, _BALANCE_SHEET_DELTA_THRESHOLD)
     rate_direction_medium_term, rate_move_date = _latest_distinct_rate_move(rate_series)
     rate_impulse_short = _rate_impulse_from_move_date(
         medium_term_direction=rate_direction_medium_term,
@@ -454,21 +423,13 @@ def build_indicator_snapshot(
 
     liquidity = LiquidityInput(
         fed_funds_rate=get_val("fed_funds_rate"),
-        # Legacy compatibility fields.
-        rate_trend_1m=rate_t1m,
-        rate_trend_3m=rate_t3m,
         balance_sheet_assets=get_val("balance_sheet"),
-        balance_sheet_trend_1m=bs_t1m,
-        balance_sheet_trend_3m=bs_t3m,
-        rate_cycle_position=_compute_cycle_position(rate_series),
-        # Doctrine-facing fields.
         rate_direction_medium_term=rate_direction_medium_term,
         rate_impulse_short=rate_impulse_short,
         balance_sheet_direction_medium_term=balance_sheet_direction_medium_term,
         balance_sheet_pace=balance_sheet_pace,
         quadrant_basis_note=(
-            "Quadrant uses the actual medium-term policy-rate path and actual medium-term "
-            "Fed balance-sheet path; transition is handled separately."
+            "Quadrant uses the actual medium-term policy-rate path and the effective market liquidity read from the Fed balance-sheet path."
         ),
     )
     plumbing = PlumbingInput(

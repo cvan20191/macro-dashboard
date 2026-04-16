@@ -50,8 +50,12 @@ const MOCK_SNAPSHOT: IndicatorSnapshot = {
   as_of: '2026-02-14T08:30:00Z',
   data_freshness: { overall_status: 'fresh', stale_series: [] },
   liquidity: {
-    fed_funds_rate: 4.75, rate_trend_1m: 'down', rate_trend_3m: 'down',
-    balance_sheet_assets: 7_200_000_000_000, balance_sheet_trend_1m: 'down', balance_sheet_trend_3m: 'flat',
+    fed_funds_rate: 4.75,
+    balance_sheet_assets: 7_200_000_000_000,
+    rate_direction_medium_term: 'easing',
+    rate_impulse_short: 'confirming_easing',
+    balance_sheet_direction_medium_term: 'contracting',
+    balance_sheet_pace: 'contracting_slower',
   },
   plumbing: {},
   growth: {
@@ -92,8 +96,12 @@ const DOCTRINE_FIXTURE_A_BUYZONE_STRESS: IndicatorSnapshot = {
   data_freshness: { overall_status: 'fresh', stale_series: [] },
   liquidity: {
     // Force Quadrant A in rules: easy policy + expanding balance sheet.
-    fed_funds_rate: 0.25, rate_trend_1m: 'down', rate_trend_3m: 'down',
-    balance_sheet_assets: 7_800_000_000_000, balance_sheet_trend_1m: 'up', balance_sheet_trend_3m: 'up',
+    fed_funds_rate: 0.25,
+    balance_sheet_assets: 7_800_000_000_000,
+    rate_direction_medium_term: 'easing',
+    rate_impulse_short: 'confirming_easing',
+    balance_sheet_direction_medium_term: 'expanding',
+    balance_sheet_pace: 'expanding_same_or_faster',
   },
   plumbing: {},
   growth: {

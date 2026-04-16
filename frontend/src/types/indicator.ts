@@ -7,14 +7,7 @@ export interface DataFreshnessInput {
 
 export interface LiquidityInput {
   fed_funds_rate?: number
-  // Legacy compatibility fields.
-  rate_trend_1m?: string
-  rate_trend_3m?: string
   balance_sheet_assets?: number
-  balance_sheet_trend_1m?: string
-  balance_sheet_trend_3m?: string
-  rate_cycle_position?: number
-  // Doctrine-facing quadrant fields.
   rate_direction_medium_term?: string
   rate_impulse_short?: string
   balance_sheet_direction_medium_term?: string

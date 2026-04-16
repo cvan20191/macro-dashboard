@@ -15,35 +15,6 @@ from app.schemas.indicator_snapshot import (
 from app.services.rules.dashboard_state_builder import build_dashboard_state_with_conclusion
 
 
-def _legacy_rate_trends(rate_direction_medium_term: str, rate_impulse_short: str) -> tuple[str, str]:
-    if rate_direction_medium_term == "easing":
-        rate_trend_3m = "down"
-        rate_trend_1m = "down" if rate_impulse_short == "confirming_easing" else "flat"
-    elif rate_direction_medium_term == "tightening":
-        rate_trend_3m = "up"
-        rate_trend_1m = "up" if rate_impulse_short == "confirming_tightening" else "flat"
-    else:
-        rate_trend_3m = "flat"
-        rate_trend_1m = "flat"
-    return rate_trend_1m, rate_trend_3m
-
-
-def _legacy_bs_trends(
-    balance_sheet_direction_medium_term: str,
-    balance_sheet_pace: str,
-) -> tuple[str, str]:
-    if balance_sheet_direction_medium_term == "contracting":
-        balance_sheet_trend_3m = "down"
-        balance_sheet_trend_1m = "flat" if balance_sheet_pace == "contracting_slower" else "down"
-    elif balance_sheet_direction_medium_term == "expanding":
-        balance_sheet_trend_3m = "up"
-        balance_sheet_trend_1m = "flat" if balance_sheet_pace == "expanding_slower" else "up"
-    else:
-        balance_sheet_trend_3m = "flat"
-        balance_sheet_trend_1m = "flat"
-    return balance_sheet_trend_1m, balance_sheet_trend_3m
-
-
 def make_snapshot(
     *,
     as_of: str,
@@ -84,12 +55,6 @@ def make_snapshot(
     reverse_repo_buffer_ratio: float = 1.0,
     stress_warning_npl: float = 0.9,
 ) -> IndicatorSnapshot:
-    rate_trend_1m, rate_trend_3m = _legacy_rate_trends(rate_direction_medium_term, rate_impulse_short)
-    balance_sheet_trend_1m, balance_sheet_trend_3m = _legacy_bs_trends(
-        balance_sheet_direction_medium_term,
-        balance_sheet_pace,
-    )
-
     total_reserves = 3000.0
     repo_total = 5.0
     reverse_repo_total = 100.0
@@ -111,12 +76,7 @@ def make_snapshot(
         ),
         liquidity=LiquidityInput(
             fed_funds_rate=fed_funds_rate,
-            rate_trend_1m=rate_trend_1m,
-            rate_trend_3m=rate_trend_3m,
             balance_sheet_assets=6_700_000.0,
-            balance_sheet_trend_1m=balance_sheet_trend_1m,
-            balance_sheet_trend_3m=balance_sheet_trend_3m,
-            rate_cycle_position=0.75,
             rate_direction_medium_term=rate_direction_medium_term,
             rate_impulse_short=rate_impulse_short,
             balance_sheet_direction_medium_term=balance_sheet_direction_medium_term,

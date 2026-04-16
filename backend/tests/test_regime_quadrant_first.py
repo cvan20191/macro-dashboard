@@ -15,42 +15,38 @@ def _snapshot(*, quadrant: str, buy_zone: bool = False, stretched: bool = False,
     if quadrant == "A":
         liquidity = LiquidityInput(
             fed_funds_rate=4.0,
-            rate_trend_1m="down",
-            rate_trend_3m="down",
             balance_sheet_assets=7_000_000,
-            balance_sheet_trend_1m="up",
-            balance_sheet_trend_3m="up",
-            rate_cycle_position=0.7,
+            rate_direction_medium_term="easing",
+            rate_impulse_short="confirming_easing",
+            balance_sheet_direction_medium_term="expanding",
+            balance_sheet_pace="expanding_same_or_faster",
         )
     elif quadrant == "B":
         liquidity = LiquidityInput(
             fed_funds_rate=4.5,
-            rate_trend_1m="up",
-            rate_trend_3m="up",
             balance_sheet_assets=7_000_000,
-            balance_sheet_trend_1m="up",
-            balance_sheet_trend_3m="up",
-            rate_cycle_position=0.8,
+            rate_direction_medium_term="tightening",
+            rate_impulse_short="confirming_tightening",
+            balance_sheet_direction_medium_term="expanding",
+            balance_sheet_pace="expanding_same_or_faster",
         )
     elif quadrant == "C":
         liquidity = LiquidityInput(
             fed_funds_rate=4.25,
-            rate_trend_1m="down",
-            rate_trend_3m="down",
             balance_sheet_assets=6_800_000,
-            balance_sheet_trend_1m="flat",
-            balance_sheet_trend_3m="down",
-            rate_cycle_position=0.7,
+            rate_direction_medium_term="easing",
+            rate_impulse_short="stable",
+            balance_sheet_direction_medium_term="contracting",
+            balance_sheet_pace="contracting_slower",
         )
     else:
         liquidity = LiquidityInput(
             fed_funds_rate=4.75,
-            rate_trend_1m="up",
-            rate_trend_3m="up",
             balance_sheet_assets=6_700_000,
-            balance_sheet_trend_1m="down",
-            balance_sheet_trend_3m="down",
-            rate_cycle_position=0.9,
+            rate_direction_medium_term="tightening",
+            rate_impulse_short="confirming_tightening",
+            balance_sheet_direction_medium_term="contracting",
+            balance_sheet_pace="contracting_same_or_faster",
         )
 
     forward_pe = 22.0 if buy_zone else 31.0 if stretched else 27.0

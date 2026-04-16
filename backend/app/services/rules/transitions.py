@@ -32,25 +32,29 @@ def compute_what_changed_details(
     liq = snapshot.liquidity
     infl = snapshot.inflation
 
-    # Rate direction
-    r1 = (liq.rate_trend_1m or "").lower()
-    if r1 == "down":
-        bullets.append(ReasonedText(code="rates_softened_1m", text="Rate direction has softened over the last month"))
-    elif r1 == "up":
-        bullets.append(ReasonedText(code="rates_higher_1m", text="Rates moved higher over the last month, adding pressure to valuations"))
-    elif r1 == "flat":
-        bullets.append(ReasonedText(code="rates_flat_1m", text="Rates have held steady — no material change in the cost of capital"))
-    elif r1 == "mixed":
-        bullets.append(ReasonedText(code="rates_mixed_1m", text="Rate direction is mixed across short and medium windows — policy impulse is less clear than a month ago"))
+    # Rate direction / impulse
+    rate_direction = (liq.rate_direction_medium_term or "").lower()
+    rate_impulse = (liq.rate_impulse_short or "").lower()
+    if rate_impulse == "confirming_easing":
+        bullets.append(ReasonedText(code="rates_confirming_easing", text="Rate-cut direction is still actively confirming — cost-of-capital pressure is easing"))
+    elif rate_impulse == "confirming_tightening":
+        bullets.append(ReasonedText(code="rates_confirming_tightening", text="Rate-hike direction is still actively confirming — valuation pressure remains elevated"))
+    elif rate_impulse == "mixed":
+        bullets.append(ReasonedText(code="rates_mixed_short", text="Short-rate impulse is mixed — the medium-term path is less clean than before"))
+    elif rate_direction == "stable":
+        bullets.append(ReasonedText(code="rates_stable_medium_term", text="Rate direction is stable — no new medium-term policy shift is confirming"))
 
-    # Balance sheet
-    b1 = (liq.balance_sheet_trend_1m or "").lower()
-    if b1 == "down":
+    # Balance sheet direction / pace
+    bs_direction = (liq.balance_sheet_direction_medium_term or "").lower()
+    bs_pace = (liq.balance_sheet_pace or "").lower()
+    if bs_direction == "contracting" and bs_pace == "contracting_same_or_faster":
         bullets.append(ReasonedText(code="balance_sheet_contracting", text="Fed balance sheet is still contracting — net liquidity support has not arrived"))
-    elif b1 == "flat":
-        bullets.append(ReasonedText(code="balance_sheet_flat", text="Balance-sheet contraction has paused; while liquidity remains supportive, the trend has not yet clearly turned into a sustained expansion."))
-    elif b1 == "up":
-        bullets.append(ReasonedText(code="balance_sheet_expanding", text="Fed balance sheet has begun expanding — a liquidity tailwind is building"))
+    elif bs_direction == "contracting" and bs_pace == "contracting_slower":
+        bullets.append(ReasonedText(code="balance_sheet_contracting_slower", text="Balance-sheet contraction is slowing, but liquidity is still being withdrawn overall"))
+    elif bs_direction == "expanding" and bs_pace == "expanding_same_or_faster":
+        bullets.append(ReasonedText(code="balance_sheet_expanding", text="Fed balance sheet is clearly expanding — a liquidity tailwind is building"))
+    elif bs_direction == "expanding" and bs_pace == "expanding_slower":
+        bullets.append(ReasonedText(code="balance_sheet_expanding_slower", text="Balance-sheet expansion is still positive, but the pace of liquidity support is slowing"))
 
     # Oil
     if stag.oil_risk_active:

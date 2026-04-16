@@ -17,12 +17,11 @@ def _base_snapshot(valuation: ValuationInput) -> IndicatorSnapshot:
     return IndicatorSnapshot(
         liquidity=LiquidityInput(
             fed_funds_rate=4.5,
-            rate_trend_1m="up",
-            rate_trend_3m="up",
             balance_sheet_assets=7_000_000,
-            balance_sheet_trend_1m="up",
-            balance_sheet_trend_3m="up",
-            rate_cycle_position=0.8,
+            rate_direction_medium_term="tightening",
+            rate_impulse_short="confirming_tightening",
+            balance_sheet_direction_medium_term="expanding",
+            balance_sheet_pace="expanding_same_or_faster",
         ),
         growth=GrowthInput(
             pmi_manufacturing=52.0,
@@ -101,10 +100,10 @@ def test_buy_zone_does_not_accumulate_when_liquidity_is_unknown() -> None:
             basis_confidence=0.95,
         )
     )
-    snapshot.liquidity.rate_trend_1m = "flat"
-    snapshot.liquidity.rate_trend_3m = "flat"
-    snapshot.liquidity.balance_sheet_trend_1m = "flat"
-    snapshot.liquidity.balance_sheet_trend_3m = "down"
+    snapshot.liquidity.rate_direction_medium_term = None
+    snapshot.liquidity.rate_impulse_short = None
+    snapshot.liquidity.balance_sheet_direction_medium_term = None
+    snapshot.liquidity.balance_sheet_pace = None
 
     state, conclusion = build_dashboard_state_with_conclusion(snapshot)
 

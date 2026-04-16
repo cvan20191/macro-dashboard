@@ -138,7 +138,8 @@ class _DummyCache:
 def test_build_indicator_snapshot_does_not_infer_fed_put_from_falling_rates() -> None:
     snapshot = build_indicator_snapshot(_live_raw_fixture(), {}, [], "fresh")
 
-    assert snapshot.liquidity.rate_trend_1m == "down"
+    assert snapshot.liquidity.rate_direction_medium_term == "easing"
+    assert snapshot.liquidity.rate_impulse_short == "confirming_easing"
     assert snapshot.policy_support.fed_put is False
     assert snapshot.policy_support.treasury_put is False
     assert snapshot.policy_support.political_put is False

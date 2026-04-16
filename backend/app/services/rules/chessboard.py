@@ -7,68 +7,12 @@ from dataclasses import dataclass
 from app.schemas.dashboard_state import FedChessboard, LiquidityPlumbing
 from app.schemas.indicator_snapshot import LiquidityInput
 
-def _legacy_rate_direction_medium_term(liq: LiquidityInput) -> str:
-    t3 = (liq.rate_trend_3m or "").lower()
-    if t3 == "down":
-        return "easing"
-    if t3 == "up":
-        return "tightening"
-    if t3 == "flat":
-        return "stable"
-    return "unknown"
-
-
-def _legacy_rate_impulse_short(liq: LiquidityInput, medium_term: str) -> str:
-    t1 = (liq.rate_trend_1m or "").lower()
-    if medium_term == "easing":
-        if t1 == "down":
-            return "confirming_easing"
-        if t1 == "flat":
-            return "stable"
-        if t1 == "up":
-            return "mixed"
-    if medium_term == "tightening":
-        if t1 == "up":
-            return "confirming_tightening"
-        if t1 == "flat":
-            return "stable"
-        if t1 == "down":
-            return "mixed"
-    if medium_term == "stable":
-        return "stable" if t1 == "flat" else "mixed"
-    return "unknown"
-
-
-def _legacy_balance_sheet_direction_medium_term(liq: LiquidityInput) -> str:
-    b3 = (liq.balance_sheet_trend_3m or "").lower()
-    if b3 == "up":
-        return "expanding"
-    if b3 == "down":
-        return "contracting"
-    return "flat_or_mixed"
-
-
-def _legacy_balance_sheet_pace(liq: LiquidityInput, medium_term: str) -> str:
-    b1 = (liq.balance_sheet_trend_1m or "").lower()
-    if medium_term == "contracting":
-        if b1 in {"flat", "up"}:
-            return "contracting_slower"
-        if b1 == "down":
-            return "contracting_same_or_faster"
-    if medium_term == "expanding":
-        if b1 in {"flat", "down"}:
-            return "expanding_slower"
-        if b1 == "up":
-            return "expanding_same_or_faster"
-    return "flat_or_mixed"
-
-
 @dataclass
 class ChessboardResult:
     chessboard: FedChessboard
     liquidity_improving: bool
     liquidity_tight: bool
-    quadrant: str  # "A" | "B" | "C" | "D" | "Unknown"
+    quadrant: str
 
 
 def _effective_balance_sheet_direction(
@@ -98,13 +42,10 @@ def compute_chessboard(
     liq: LiquidityInput,
     plumbing: LiquidityPlumbing | None = None,
 ) -> ChessboardResult:
-    rate_direction = liq.rate_direction_medium_term or _legacy_rate_direction_medium_term(liq)
-    rate_impulse_short = liq.rate_impulse_short or _legacy_rate_impulse_short(liq, rate_direction)
-    raw_balance_sheet_direction = (
-        liq.balance_sheet_direction_medium_term
-        or _legacy_balance_sheet_direction_medium_term(liq)
-    )
-    balance_sheet_pace = liq.balance_sheet_pace or _legacy_balance_sheet_pace(liq, raw_balance_sheet_direction)
+    rate_direction = (liq.rate_direction_medium_term or "unknown").lower()
+    rate_impulse_short = (liq.rate_impulse_short or "unknown").lower()
+    raw_balance_sheet_direction = (liq.balance_sheet_direction_medium_term or "flat_or_mixed").lower()
+    balance_sheet_pace = (liq.balance_sheet_pace or "flat_or_mixed").lower()
     (
         effective_balance_sheet_direction,
         balance_sheet_liquidity_interpretation,
@@ -136,22 +77,20 @@ def compute_chessboard(
     if quadrant == "D" and balance_sheet_pace == "contracting_slower" and rate_impulse_short in {"stable", "mixed"}:
         liquidity_transition_path = "D_to_C"
         transition_tag = "Improving"
-        d_to_c_note = (
-            "Actual quadrant remains D, but the path is transitioning toward C because QT is "
-            "still ongoing but slowing and the rate path is no longer actively tightening."
-        )
-        transition_basis_note = (
-            f"{transition_basis_note} {d_to_c_note}" if transition_basis_note else d_to_c_note
-        )
+        if transition_basis_note:
+            transition_basis_note = (
+                f"{transition_basis_note} Actual quadrant remains D, but the market is transitioning toward C because QT is slowing."
+            )
+        else:
+            transition_basis_note = (
+                "Actual quadrant remains D, but the market is transitioning toward C because QT is slowing."
+            )
+    elif quadrant == "C":
+        transition_tag = "Improving" if balance_sheet_pace == "contracting_slower" or rate_impulse_short == "confirming_easing" else "Stable"
     elif quadrant == "A":
         transition_tag = "Improving"
     elif quadrant == "B":
         transition_tag = "Stable"
-    elif quadrant == "C":
-        if balance_sheet_pace == "contracting_slower" or rate_impulse_short == "confirming_easing":
-            transition_tag = "Improving"
-        else:
-            transition_tag = "Stable"
     elif quadrant == "D":
         transition_tag = "Deteriorating"
     else:
@@ -173,8 +112,7 @@ def compute_chessboard(
         transition_tag=transition_tag,
         quadrant_basis_note=(
             liq.quadrant_basis_note
-            or "Quadrant uses the actual medium-term policy-rate path and the effective market "
-            "liquidity read from the Fed balance-sheet path."
+            or "Quadrant uses the actual medium-term policy-rate path and the effective market liquidity read from the Fed balance-sheet path."
         ),
         transition_basis_note=transition_basis_note,
     )
