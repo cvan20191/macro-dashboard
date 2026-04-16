@@ -12,6 +12,7 @@ from app.schemas.indicator_snapshot import (
     SystemicStressInput,
     ValuationInput,
 )
+from app.services.rules import dashboard_state_builder as dashboard_state_builder_module
 from app.services.rules.dashboard_state_builder import build_dashboard_state_with_conclusion
 
 
@@ -387,7 +388,9 @@ def test_after_actual_rate_path_turns_down_regime_becomes_c() -> None:
     assert conclusion is not None
 
 
-def test_late_september_2025_high_valuation_pauses_new_buying_but_keeps_c() -> None:
+def test_late_september_style_stretch_blocks_new_buying_but_keeps_positions(
+    monkeypatch,
+) -> None:
     snapshot = make_snapshot(
         as_of="2025-09-30T00:00:00Z",
         fed_funds_rate=4.25,
@@ -411,10 +414,28 @@ def test_late_september_2025_high_valuation_pauses_new_buying_but_keeps_c() -> N
         political_put=True,
     )
 
+    monkeypatch.setattr(
+        dashboard_state_builder_module,
+        "load_fedwatch_snapshot",
+        lambda: {
+            "as_of": "2025-09-30",
+            "source_mode": "manual_snapshot",
+            "current_target_mid": 4.25,
+            "meetings": [
+                {"meeting_label": "2025-11", "expected_end_rate_mid": 4.0},
+                {"meeting_label": "2025-12", "expected_end_rate_mid": 3.75},
+            ],
+        },
+    )
+
     state, conclusion = build_dashboard_state_with_conclusion(snapshot)
 
+    assert state.market_priced_easing is not None
+    assert state.market_priced_easing.pricing_stretch_active is True
     assert state.primary_regime.startswith("Quadrant C")
     assert state.tactical_state == "Hold / no new buying"
+    assert state.allocation_plan is not None
+    assert state.allocation_plan.portfolio_action in {"pause_broad_market_adds", "defensive_only"}
     assert conclusion.new_cash_action == "pause_new_buying"
 
 

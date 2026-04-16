@@ -3,6 +3,7 @@ from app.schemas.dashboard_state import (
     CohortRotationItem,
     ExposureGuidance,
     FedChessboard,
+    MarketEasingExpectations,
 )
 from app.services.rules.allocation_plan import compute_allocation_plan
 
@@ -130,4 +131,52 @@ def test_no_allowed_lanes_means_pause_or_wait() -> None:
         cohort_rotation_guidance=cohort,
     )
 
+    assert result.plan.portfolio_action == "pause_broad_market_adds"
+
+
+def test_pricing_stretch_downgrades_transition_mag7_lane_to_watch_only() -> None:
+    fed = FedChessboard(
+        quadrant="D",
+        liquidity_transition_path="D_to_C",
+        transition_tag="Improving",
+    )
+    exposure = ExposureGuidance(
+        deployment_style="defensive",
+        max_cash_deployment_pct=20,
+        leverage_allowed=False,
+    )
+    cohort = CohortRotationGuidance(
+        items=[
+            CohortRotationItem(
+                cohort_code="mag7",
+                label="Mag 7",
+                stance="accumulate_slowly",
+                signal_mode="actionable",
+                reason="Emerging transition trade.",
+            ),
+            CohortRotationItem(
+                cohort_code="non_ai_low_valuation_defensive",
+                label="Defensive",
+                stance="watch",
+                signal_mode="directional_only",
+                reason="Fallback anchor.",
+            ),
+        ],
+        defensive_anchor_code="non_ai_low_valuation_defensive",
+    )
+    market_priced_easing = MarketEasingExpectations(
+        expected_cut_bps_12m=50.0,
+        expected_cut_count_12m=2.0,
+        pricing_stretch_active=True,
+    )
+
+    result = compute_allocation_plan(
+        fed_chessboard=fed,
+        exposure_guidance=exposure,
+        cohort_rotation_guidance=cohort,
+        market_priced_easing=market_priced_easing,
+    )
+
+    lane_map = {lane.cohort_code: lane for lane in result.plan.lanes}
+    assert lane_map["mag7"].permission == "watch_only"
     assert result.plan.portfolio_action == "pause_broad_market_adds"

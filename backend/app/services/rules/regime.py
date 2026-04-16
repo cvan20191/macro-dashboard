@@ -12,8 +12,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from app.schemas.dashboard_state import EquityProfileGuidance, ExposureGuidance
+from app.schemas.dashboard_state import (
+    EquityProfileGuidance,
+    ExposureGuidance,
+    MarketEasingExpectations,
+)
 from app.services.rules.chessboard import ChessboardResult
+from app.services.rules.market_pricing_guard import pricing_stretch_blocks_new_buys
 from app.services.rules.policy_optionality import PolicyOptionalityResult
 from app.services.rules.rally import RallyResult
 from app.services.rules.stagflation import StagflationResult
@@ -75,33 +80,45 @@ def _derive_tactical_state(
     val: ValuationResult,
     stress: StressResult,
     policy_optionality: PolicyOptionalityResult,
+    market_priced_easing: MarketEasingExpectations | None = None,
 ) -> str:
     transition_path = cb.chessboard.liquidity_transition_path
 
     if cb.quadrant == "Unknown":
         return T_WAIT
-    if stress.stress_severe:
+    if stress.stress_severe or (stag.trap.active and cb.liquidity_tight):
         return T_DEFENSIVE
-    if cb.quadrant == "D":
-        if (
-            transition_path == "D_to_C"
-            and val.can_support_buy_zone
-            and not policy_optionality.fed_trapped
-            and not policy_optionality.rate_cut_weirdness_active
-            and not stress.stress_severe
-        ):
-            return T_START_SLOWLY
+
+    if cb.quadrant == "D" and transition_path != "D_to_C":
         return T_DEFENSIVE
+
+    if pricing_stretch_blocks_new_buys(
+        fed_chessboard=cb.chessboard,
+        market_priced_easing=market_priced_easing,
+    ):
+        return T_HOLD_NO_ADD
+
     if cb.quadrant == "A":
-        if val.can_pause_new_buying or stag.trap.active:
+        if val.can_pause_new_buying:
             return T_HOLD_NO_ADD
         return T_AGGRESSIVE
     if cb.quadrant == "B":
-        if val.can_pause_new_buying or stag.trap.active:
+        if val.can_pause_new_buying:
             return T_HOLD_NO_ADD
         return T_SELECTIVE
+
+    if cb.quadrant == "D" and transition_path == "D_to_C":
+        if (
+            val.can_support_buy_zone
+            and not policy_optionality.fed_trapped
+            and not policy_optionality.rate_cut_weirdness_active
+        ):
+            return T_START_SLOWLY
+        return T_HOLD_NO_ADD
+
     if val.can_pause_new_buying:
         return T_HOLD_NO_ADD
+
     if (
         val.can_support_buy_zone
         and cb.chessboard.transition_tag in {"Improving", "Stable"}
@@ -254,9 +271,17 @@ def compute_regime(
     dollar: DollarResult,
     rally: RallyResult,
     policy_optionality: PolicyOptionalityResult,
+    market_priced_easing: MarketEasingExpectations | None = None,
 ) -> RegimeResult:
     primary_regime = _quadrant_regime_label(cb)
-    tactical_state = _derive_tactical_state(cb, stag, val, stress, policy_optionality)
+    tactical_state = _derive_tactical_state(
+        cb,
+        stag,
+        val,
+        stress,
+        policy_optionality,
+        market_priced_easing,
+    )
     legacy_regime_label = _legacy_label(tactical_state, cb, stag, val, stress)
     exposure_guidance = _derive_exposure_guidance(cb)
     equity_profile_guidance = _derive_equity_profile_guidance(cb)
@@ -284,6 +309,8 @@ def compute_regime(
         overlays.append(O_BAD_DATA_GOOD)
     if policy_optionality.rate_cut_weirdness_active:
         overlays.append(O_WEIRD_CUT_LOW_ROOM)
+    if market_priced_easing is not None and market_priced_easing.pricing_stretch_active:
+        overlays.append("Cuts Already Priced In")
 
     # ── Confidence ───────────────────────────────────────────────────────────
     # Count how many signals align with the classified regime

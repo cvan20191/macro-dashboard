@@ -9,6 +9,7 @@ Phase 1 scope:
 
 from __future__ import annotations
 
+from app.schemas.dashboard_state import MarketEasingExpectations
 from app.schemas.playbook_conclusion import (
     ArchetypeLabel,
     ExistingPositionsAction,
@@ -18,6 +19,7 @@ from app.schemas.playbook_conclusion import (
     WarningUrgency,
 )
 from app.services.rules.chessboard import ChessboardResult
+from app.services.rules.market_pricing_guard import pricing_stretch_blocks_new_buys
 from app.services.rules.policy_optionality import PolicyOptionalityResult
 from app.services.rules.rally import RallyResult
 from app.services.rules.regime import RegimeResult
@@ -111,12 +113,47 @@ def _defensive_override_needed(
     return stress.stress_severe or (stag.trap.active and cb.liquidity_tight)
 
 
+def _can_accumulate_in_speaker_terms(
+    cb: ChessboardResult,
+    val: ValuationResult,
+    stag: StagflationResult,
+    stress: StressResult,
+    policy_optionality: PolicyOptionalityResult,
+    market_priced_easing: MarketEasingExpectations | None = None,
+) -> bool:
+    if not val.can_support_buy_zone:
+        return False
+    if stress.stress_severe or stag.trap.active:
+        return False
+    if policy_optionality.fed_trapped:
+        return False
+    if policy_optionality.rate_cut_weirdness_active:
+        return False
+    if pricing_stretch_blocks_new_buys(
+        fed_chessboard=cb.chessboard,
+        market_priced_easing=market_priced_easing,
+    ):
+        return False
+
+    transition_path = cb.chessboard.liquidity_transition_path
+
+    if cb.quadrant == "A":
+        return True
+    if cb.quadrant == "C" and cb.chessboard.transition_tag in {"Improving", "Stable"}:
+        return True
+    if cb.quadrant == "D" and transition_path == "D_to_C":
+        return True
+
+    return False
+
+
 def _derive_new_cash_action(
     cb: ChessboardResult,
     val: ValuationResult,
     stag: StagflationResult,
     stress: StressResult,
     policy_optionality: PolicyOptionalityResult,
+    market_priced_easing: MarketEasingExpectations | None = None,
 ) -> NewCashAction:
     transition_path = cb.chessboard.liquidity_transition_path
 
@@ -124,33 +161,25 @@ def _derive_new_cash_action(
         return "hold_and_wait"
     if _defensive_override_needed(cb, val, stag, stress):
         return "defensive_preservation"
+    if cb.quadrant == "D" and transition_path != "D_to_C":
+        return "defensive_preservation"
+    if pricing_stretch_blocks_new_buys(
+        fed_chessboard=cb.chessboard,
+        market_priced_easing=market_priced_easing,
+    ):
+        return "pause_new_buying"
     if val.can_pause_new_buying:
         return "pause_new_buying"
-    if cb.quadrant == "A" and not stag.trap.active and not stress.stress_severe:
-        return "accumulate_selectively"
-    if (
-        cb.quadrant == "C"
-        and val.can_support_buy_zone
-        and cb.chessboard.transition_tag in {"Improving", "Stable"}
-        and not stag.trap.active
-        and not stress.stress_severe
-        and not policy_optionality.fed_trapped
-        and not policy_optionality.rate_cut_weirdness_active
+    if _can_accumulate_in_speaker_terms(
+        cb=cb,
+        val=val,
+        stag=stag,
+        stress=stress,
+        policy_optionality=policy_optionality,
+        market_priced_easing=market_priced_easing,
     ):
         return "accumulate_selectively"
-    if (
-        cb.quadrant == "D"
-        and transition_path == "D_to_C"
-        and val.can_support_buy_zone
-        and not stag.trap.active
-        and not stress.stress_severe
-        and not policy_optionality.fed_trapped
-        and not policy_optionality.rate_cut_weirdness_active
-    ):
-        return "accumulate_selectively"
-    if cb.quadrant == "D":
-        return "hold_and_wait"
-    if cb.quadrant == "B":
+    if cb.quadrant in {"B", "D"}:
         return "hold_and_wait"
     return "hold_and_wait"
 
@@ -290,6 +319,7 @@ def build_playbook_conclusion(
     policy_optionality: PolicyOptionalityResult,
     rally: RallyResult,
     regime: RegimeResult,
+    market_priced_easing: MarketEasingExpectations | None = None,
 ) -> PlaybookConclusion:
     preferred, avoid = _quadrant_archetypes(cb.quadrant)
 
@@ -315,7 +345,14 @@ def build_playbook_conclusion(
 
     return PlaybookConclusion(
         conclusion_label=regime.primary_regime,
-        new_cash_action=_derive_new_cash_action(cb, val, stag, stress, policy_optionality),
+        new_cash_action=_derive_new_cash_action(
+            cb,
+            val,
+            stag,
+            stress,
+            policy_optionality,
+            market_priced_easing,
+        ),
         existing_positions_action=_derive_existing_positions_action(cb, val, stag, stress),
         stock_archetype_preferred=preferred,
         stock_archetype_avoid=avoid,

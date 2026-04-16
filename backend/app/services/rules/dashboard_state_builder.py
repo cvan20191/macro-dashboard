@@ -123,7 +123,16 @@ def _run_rules(snapshot: IndicatorSnapshot) -> _RuleOutputs:
     rally = compute_rally(cb, stag, val, stress, snapshot.policy_support)
 
     # ── Step 9: Regime ────────────────────────────────────────────────────────
-    regime = compute_regime(cb, stag, val, stress, dollar, rally, policy_optionality)
+    regime = compute_regime(
+        cb,
+        stag,
+        val,
+        stress,
+        dollar,
+        rally,
+        policy_optionality,
+        market_priced_easing.easing,
+    )
 
     # ── Step 10: Exit Discipline ─────────────────────────────────────────────
     exit_signal = compute_exit_discipline_signal(cb)
@@ -146,6 +155,7 @@ def _run_rules(snapshot: IndicatorSnapshot) -> _RuleOutputs:
         fed_chessboard=cb.chessboard,
         exposure_guidance=regime.exposure_guidance,
         cohort_rotation_guidance=cohort_rotation.guidance,
+        market_priced_easing=market_priced_easing.easing,
     )
 
     # ── Step 14: Top Watchpoints ──────────────────────────────────────────────
@@ -377,5 +387,6 @@ def build_dashboard_state_with_conclusion(
         policy_optionality=r.policy_optionality,
         rally=r.rally,
         regime=r.regime,
+        market_priced_easing=r.market_priced_easing.easing,
     )
     return state, conclusion
