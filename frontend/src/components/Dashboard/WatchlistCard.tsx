@@ -2,6 +2,7 @@ import type { DashboardState } from '../../types/summary'
 
 import CohortRotationCard from './CohortRotationCard'
 import PeerScorecardsCard from './PeerScorecardsCard'
+import StrategicWatchlistCard from './StrategicWatchlistCard'
 
 interface Props {
   state?: DashboardState | null
@@ -12,6 +13,7 @@ export function WatchlistCard({ state }: Props) {
 
   return (
     <div style={styles.wrapper}>
+      <StrategicWatchlistCard state={state} />
       <CohortRotationCard state={state} />
       <PeerScorecardsCard state={state} />
     </div>

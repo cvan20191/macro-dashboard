@@ -1,0 +1,26 @@
+[
+  {
+    "code": "new_fed_chair",
+    "label": "New Fed Chair",
+    "kind": "manual_event",
+    "status": "watch",
+    "priority": 2,
+    "note": "Monitor the policy lean of the next Fed chair. A more aggressively dovish chair can change the rate trajectory materially."
+  },
+  {
+    "code": "spacex_ipo",
+    "label": "SpaceX IPO / Elon Signal",
+    "kind": "manual_event",
+    "status": "watch",
+    "priority": 2,
+    "note": "Delay or weak demand around a large Elon-linked IPO would be a negative read on market liquidity and sentiment."
+  },
+  {
+    "code": "ai_ipos",
+    "label": "AI IPO Pipeline",
+    "kind": "manual_event",
+    "status": "watch",
+    "priority": 2,
+    "note": "Large AI IPO execution and demand are important sentiment checks for AI-led market leadership."
+  }
+]

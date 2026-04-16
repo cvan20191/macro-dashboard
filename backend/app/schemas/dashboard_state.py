@@ -265,6 +265,21 @@ class PeerScorecard(BaseModel):
     note: str | None = None
 
 
+class StrategicWatchlistItem(BaseModel):
+    code: str
+    label: str
+    kind: str = "manual_event"  # manual_event | derived_macro
+    status: str = "watch"  # supportive | mixed | warning | watch
+    source_mode: str = "manual"  # manual | derived
+    priority: int = 3
+    note: str | None = None
+
+
+class StrategicWatchlist(BaseModel):
+    items: list[StrategicWatchlistItem] = Field(default_factory=list)
+    note: str | None = None
+
+
 class ReasonedText(BaseModel):
     code: str
     text: str
@@ -305,6 +320,7 @@ class DashboardState(BaseModel):
     cohort_rotation_guidance: CohortRotationGuidance | None = None
     deterministic_summary: DeterministicSummary | None = None
     peer_scorecards: list[PeerScorecard] = Field(default_factory=list)
+    strategic_watchlist: StrategicWatchlist | None = None
     top_watchpoints: list[str] = Field(default_factory=list)
     top_watchpoint_details: list[ReasonedText] = Field(default_factory=list)
     what_changed: list[str] = Field(default_factory=list)

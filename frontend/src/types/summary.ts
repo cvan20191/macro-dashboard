@@ -282,6 +282,21 @@ export interface PeerScorecard {
   note?: string | null
 }
 
+export interface StrategicWatchlistItem {
+  code?: string
+  label?: string
+  kind?: string
+  status?: string
+  source_mode?: string
+  priority?: number
+  note?: string | null
+}
+
+export interface StrategicWatchlist {
+  items?: StrategicWatchlistItem[]
+  note?: string | null
+}
+
 export interface DashboardState {
   as_of?: string
   data_freshness: DataFreshness
@@ -315,6 +330,7 @@ export interface DashboardState {
   cohort_rotation_guidance?: CohortRotationGuidance
   deterministic_summary?: DeterministicSummary
   peer_scorecards?: PeerScorecard[]
+  strategic_watchlist?: StrategicWatchlist
   top_watchpoints: string[]
   top_watchpoint_details?: Array<{ code: string; text: string }>
   what_changed: string[]
