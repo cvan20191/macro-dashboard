@@ -208,7 +208,7 @@ class ExitDisciplineSignal(BaseModel):
 class CohortRotationItem(BaseModel):
     cohort_code: str
     label: str
-    stance: str = "neutral"  # overweight | accumulate_slowly | neutral | underweight | avoid
+    stance: str = "neutral"  # overweight | accumulate_slowly | neutral | watch | underweight | avoid
     reason: str | None = None
     forward_pe: float | None = None
     signal_mode: SignalMode = "directional_only"

@@ -10,6 +10,7 @@ interface Props {
 function stanceColor(stance?: string): string {
   if (stance === 'overweight') return 'var(--green)'
   if (stance === 'accumulate_slowly') return 'var(--blue)'
+  if (stance === 'watch') return 'var(--blue-2, var(--blue))'
   if (stance === 'underweight' || stance === 'avoid') return 'var(--yellow)'
   return 'var(--text-secondary)'
 }
