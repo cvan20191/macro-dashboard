@@ -35,7 +35,7 @@ def test_d_to_c_summary_keeps_actual_d_but_mentions_transition() -> None:
     )
     conclusion = PlaybookConclusion(
         conclusion_label="Transition regime",
-        new_cash_action="accumulate_selectively",
+        new_cash_action="hold_and_wait",
         warning_urgency="cautionary",
         why_now="liquidity_quadrant_d_tight",
     )
@@ -44,7 +44,7 @@ def test_d_to_c_summary_keeps_actual_d_but_mentions_transition() -> None:
 
     assert summary.headline == "Quadrant D / Illiquid Regime"
     assert summary.subheadline == "Actual quadrant is still D, but liquidity is transitioning toward C."
-    assert summary.action_line == "Action: accumulate selectively."
+    assert summary.action_line == "Action: hold and wait."
     assert summary.deployment_line == "Deployment: up to 20% cash; leverage allowed = no."
 
 

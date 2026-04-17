@@ -89,7 +89,9 @@ def _derive_tactical_state(
     if stress.stress_severe or (stag.trap.active and cb.liquidity_tight):
         return T_DEFENSIVE
 
-    if cb.quadrant == "D" and transition_path != "D_to_C":
+    # Actual D remains defensive at the top level. Transition improves the
+    # interpretation, but it does not rewrite the base quadrant into C.
+    if cb.quadrant == "D":
         return T_DEFENSIVE
 
     if pricing_stretch_blocks_new_buys(
@@ -106,15 +108,6 @@ def _derive_tactical_state(
         if val.can_pause_new_buying:
             return T_HOLD_NO_ADD
         return T_SELECTIVE
-
-    if cb.quadrant == "D" and transition_path == "D_to_C":
-        if (
-            val.can_support_buy_zone
-            and not policy_optionality.fed_trapped
-            and not policy_optionality.rate_cut_weirdness_active
-        ):
-            return T_START_SLOWLY
-        return T_HOLD_NO_ADD
 
     if val.can_pause_new_buying:
         return T_HOLD_NO_ADD

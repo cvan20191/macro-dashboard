@@ -135,13 +135,9 @@ def _can_accumulate_in_speaker_terms(
     ):
         return False
 
-    transition_path = cb.chessboard.liquidity_transition_path
-
     if cb.quadrant == "A":
         return True
     if cb.quadrant == "C" and cb.chessboard.transition_tag in {"Improving", "Stable"}:
-        return True
-    if cb.quadrant == "D" and transition_path == "D_to_C":
         return True
 
     return False

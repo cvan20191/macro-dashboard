@@ -92,3 +92,24 @@ def test_quadrant_c_buy_zone_accumulates_only_in_transition() -> None:
     assert state.primary_regime == "Quadrant C / Liquidity Transition"
     assert state.tactical_state == "Start buying very slowly"
     assert conclusion.new_cash_action == "accumulate_selectively"
+
+
+def test_d_to_c_transition_keeps_top_level_quadrant_d_semantics() -> None:
+    liquidity = LiquidityInput(
+        fed_funds_rate=4.50,
+        balance_sheet_assets=6_700_000,
+        rate_direction_medium_term="tightening",
+        rate_impulse_short="stable",
+        balance_sheet_direction_medium_term="contracting",
+        balance_sheet_pace="contracting_slower",
+    )
+
+    state, conclusion = build_dashboard_state_with_conclusion(
+        _snapshot(quadrant="D", buy_zone=True).model_copy(update={"liquidity": liquidity})
+    )
+
+    assert state.primary_regime == "Quadrant D / Illiquid Regime"
+    assert state.fed_chessboard is not None
+    assert state.fed_chessboard.liquidity_transition_path == "D_to_C"
+    assert state.tactical_state == "Defensive preservation"
+    assert conclusion.new_cash_action == "hold_and_wait"

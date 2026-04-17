@@ -163,7 +163,7 @@ def make_snapshot(
     )
 
 
-def test_early_april_2025_is_actual_d_but_transitioning_to_c_with_slow_buying() -> None:
+def test_early_april_2025_is_actual_d_but_top_level_stays_defensive() -> None:
     snapshot = make_snapshot(
         as_of="2025-04-10T00:00:00Z",
         fed_funds_rate=4.50,
@@ -196,11 +196,11 @@ def test_early_april_2025_is_actual_d_but_transitioning_to_c_with_slow_buying() 
     assert state.policy_optionality is not None
     assert state.policy_optionality.constraint_level in {"limited", "free"}
     assert state.fed_chessboard.liquidity_transition_path == "D_to_C"
-    assert state.tactical_state == "Start buying very slowly"
+    assert state.tactical_state == "Defensive preservation"
     assert state.exposure_guidance is not None
     assert state.exposure_guidance.max_cash_deployment_pct == 20
     assert state.exposure_guidance.leverage_allowed is False
-    assert conclusion.new_cash_action == "accumulate_selectively"
+    assert conclusion.new_cash_action == "hold_and_wait"
 
 
 def test_early_april_transition_surfaces_emerging_c_profile_while_actual_profile_stays_defensive() -> None:
@@ -238,9 +238,9 @@ def test_early_april_transition_surfaces_emerging_c_profile_while_actual_profile
     assert state.equity_profile_guidance is not None
     assert state.equity_profile_guidance.primary_profile_code == "stock_a_type"
     assert state.equity_profile_guidance.emerging_profile_code == "stock_c_type"
-    assert state.tactical_state == "Start buying very slowly"
+    assert state.tactical_state == "Defensive preservation"
     assert conclusion is not None
-    assert conclusion.new_cash_action == "accumulate_selectively"
+    assert conclusion.new_cash_action == "hold_and_wait"
 
 
 def test_a_regime_exit_signal_appears_when_liquidity_support_stops_confirming() -> None:
@@ -355,7 +355,7 @@ def test_early_april_transition_has_consistent_top_line_and_cohort_action() -> N
     lane_map = {lane.cohort_code: lane for lane in state.allocation_plan.lanes}
     assert lane_map["mag7"].permission == "allowed"
     assert conclusion is not None
-    assert conclusion.new_cash_action == "accumulate_selectively"
+    assert conclusion.new_cash_action == "hold_and_wait"
 
 
 def test_after_actual_rate_path_turns_down_regime_becomes_c() -> None:
@@ -579,7 +579,7 @@ def test_trapped_environment_blocks_early_transition_buying() -> None:
     assert conclusion.new_cash_action != "accumulate_selectively"
 
 
-def test_limited_or_free_environment_allows_early_transition_buying() -> None:
+def test_limited_or_free_environment_keeps_transition_top_level_defensive() -> None:
     snapshot = make_snapshot(
         as_of="2025-04-10T00:00:00Z",
         fed_funds_rate=4.50,
@@ -609,9 +609,9 @@ def test_limited_or_free_environment_allows_early_transition_buying() -> None:
 
     assert state.policy_optionality is not None
     assert state.policy_optionality.constraint_level in {"limited", "free"}
-    assert state.tactical_state == "Start buying very slowly"
+    assert state.tactical_state == "Defensive preservation"
     assert conclusion is not None
-    assert conclusion.new_cash_action == "accumulate_selectively"
+    assert conclusion.new_cash_action == "hold_and_wait"
 
 
 def test_weird_cut_environment_blocks_transition_buying_even_with_supportive_valuation() -> None:
